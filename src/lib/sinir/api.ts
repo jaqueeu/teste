@@ -22,6 +22,9 @@ export class SinirAPI {
   constructor(private apiKey: string, private secret: string) {}
 
   async authenticate() {
+    if (!this.apiKey || !this.secret) {
+      throw new Error('Missing SINIR API credentials. Cannot authenticate.');
+    }
     // Implementar lógica de autenticação real aqui
     console.log('Autenticando no SINIR...');
     this.token = 'mock_token_123';
@@ -55,6 +58,6 @@ export class SinirAPI {
 
 // Instância singleton para uso na aplicação
 export const sinirClient = new SinirAPI(
-  process.env.SINIR_API_KEY || 'mock_key',
-  process.env.SINIR_SECRET || 'mock_secret'
+  process.env.SINIR_API_KEY || '',
+  process.env.SINIR_SECRET || ''
 );
