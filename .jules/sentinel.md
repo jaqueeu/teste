@@ -1,0 +1,4 @@
+## 2026-06-06 - Missing Security Headers in Next.js config
+**Vulnerability:** The Next.js application was missing standard security headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Strict-Transport-Security, X-DNS-Prefetch-Control), making it susceptible to several attacks including clickjacking and MIME-type sniffing.
+**Learning:** Next.js doesn't apply standard security headers out of the box to all routes. They must be explicitly configured in the `next.config.ts` file using the `headers()` method.
+**Prevention:** Always verify and include a robust security headers configuration in the `next.config.ts` for all Next.js projects as a baseline security measure.
