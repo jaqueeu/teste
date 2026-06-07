@@ -1,0 +1,4 @@
+## 2026-06-07 - [Missing Input Validation in Server Actions]
+**Vulnerability:** Next.js Server Actions for creating clients and suppliers lacked proper input validation (type checking and length limits) and securely handled errors, potentially exposing the application to DoS attacks via large payloads or leaking internal stack traces during unexpected errors.
+**Learning:** Next.js Server Actions receive `FormData` which can contain arbitrary strings or files. Inputs must always be validated and sanitized before being processed or passed to an ORM like Prisma. Furthermore, unhandled exceptions in Server Actions can sometimes leak sensitive information or crash the process ungracefully if not caught.
+**Prevention:** Always implement strict type checking and apply length/size limits to all user inputs in Server Actions. Use `try/catch` blocks to handle exceptions securely and prevent sensitive error details from bubbling up to the client.

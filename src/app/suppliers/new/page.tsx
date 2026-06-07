@@ -6,16 +6,26 @@ export default function NewSupplierPage() {
   async function createSupplier(formData: FormData) {
     'use server';
 
-    const name = formData.get('name') as string;
-    const email = formData.get('email') as string;
-    const phone = formData.get('phone') as string;
-    const document = formData.get('document') as string;
+    const name = formData.get('name');
+    const email = formData.get('email');
+    const phone = formData.get('phone');
+    const document = formData.get('document');
 
-    if (!name) return;
+    // Security Enhancement: Input validation & length limits
+    if (!name || typeof name !== 'string' || name.length > 255) return;
+    if (email && (typeof email !== 'string' || email.length > 255)) return;
+    if (phone && (typeof phone !== 'string' || phone.length > 50)) return;
+    if (document && (typeof document !== 'string' || document.length > 50)) return;
 
-    await prisma.supplier.create({
-      data: { name, email, phone, document }
-    });
+    try {
+      await prisma.supplier.create({
+        data: { name, email, phone, document }
+      });
+    } catch {
+      // Security: Prevent stack trace leakage in Server Actions
+      console.error('Failed to create supplier');
+      return; // Return silently or return generic error
+    }
 
     redirect('/suppliers');
   }
