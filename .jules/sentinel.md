@@ -1,0 +1,4 @@
+## 2023-11-20 - [Missing Security Headers]
+**Vulnerability:** The application was missing default security headers such as `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`. This lack of defense-in-depth exposed the application to risks like Clickjacking, Cross-Site Scripting (XSS), and MIME-sniffing.
+**Learning:** Next.js does not apply strict security headers by default. They must be explicitly configured in `next.config.ts`.
+**Prevention:** Always include a baseline set of security headers in `next.config.ts` for all routes (`/(.*)`) to ensure the application starts with a strong defense-in-depth posture.
