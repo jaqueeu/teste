@@ -6,16 +6,35 @@ export default function NewClientPage() {
   async function createClient(formData: FormData) {
     'use server';
 
-    const name = formData.get('name') as string;
-    const email = formData.get('email') as string;
-    const phone = formData.get('phone') as string;
-    const document = formData.get('document') as string;
+    try {
+      const name = formData.get('name');
+      const email = formData.get('email');
+      const phone = formData.get('phone');
+      const document = formData.get('document');
 
-    if (!name) return;
+      // Security: Validate input types and lengths to prevent injection and DoS
+      if (
+        typeof name !== 'string' || name.length === 0 || name.length > 100 ||
+        (email !== null && (typeof email !== 'string' || email.length > 255)) ||
+        (phone !== null && (typeof phone !== 'string' || phone.length > 20)) ||
+        (document !== null && (typeof document !== 'string' || document.length > 20))
+      ) {
+        throw new Error('Invalid input data');
+      }
 
-    await prisma.client.create({
-      data: { name, email, phone, document }
-    });
+      await prisma.client.create({
+        data: {
+          name: name.trim(),
+          email: email ? email.trim() : null,
+          phone: phone ? phone.trim() : null,
+          document: document ? document.trim() : null
+        }
+      });
+    } catch {
+      // Security: Don't leak stack traces or db errors
+      console.error('Failed to create client');
+      return;
+    }
 
     redirect('/clients');
   }
