@@ -1,0 +1,4 @@
+## 2023-10-27 - Unvalidated FormData in Next.js Server Actions
+**Vulnerability:** Next.js Server Actions implicitly trusting `FormData` inputs by casting them to strings (e.g., `formData.get('name') as string`). If an attacker sends a `File` object or large strings, the application could crash or suffer from DoS when trying to save to the database. Additionally, unhandled database errors leak information.
+**Learning:** In Next.js App Router, Server Actions act as public API endpoints. `formData.get()` can return `FormDataEntryValue | null` (which includes `File`). Blind casting `as string` bypasses runtime checks, causing errors in Prisma if a File object or missing value is passed.
+**Prevention:** Always check `typeof` for `formData.get()` returns. Implement explicit length validation to prevent string-based DoS. Wrap database operations in `try/catch` and return generic errors to the client, preventing stack trace or DB structure leakage.
