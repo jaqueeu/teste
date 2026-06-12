@@ -6,12 +6,28 @@ export default function NewClientPage() {
   async function createClient(formData: FormData) {
     'use server';
 
-    const name = formData.get('name') as string;
-    const email = formData.get('email') as string;
-    const phone = formData.get('phone') as string;
-    const document = formData.get('document') as string;
+    const nameEntry = formData.get('name');
+    const emailEntry = formData.get('email');
+    const phoneEntry = formData.get('phone');
+    const documentEntry = formData.get('document');
 
-    if (!name) return;
+    if (
+      typeof nameEntry !== 'string' ||
+      typeof emailEntry !== 'string' ||
+      typeof phoneEntry !== 'string' ||
+      typeof documentEntry !== 'string'
+    ) {
+      return; // Invalid input type
+    }
+
+    const name = nameEntry.trim();
+    const email = emailEntry.trim();
+    const phone = phoneEntry.trim();
+    const document = documentEntry.trim();
+
+    if (!name || name.length > 255 || email.length > 255 || phone.length > 50 || document.length > 50) {
+      return; // Invalid length (prevent DoS/Prisma errors)
+    }
 
     await prisma.client.create({
       data: { name, email, phone, document }
