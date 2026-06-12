@@ -8,9 +8,26 @@ export default async function SinirPage() {
   async function handleEmitirMTR(formData: FormData) {
     'use server';
 
-    const geradorId = formData.get('geradorId') as string;
-    const transportadorId = formData.get('transportadorId') as string;
-    const destinadorId = formData.get('destinadorId') as string;
+    const geradorIdEntry = formData.get('geradorId');
+    const transportadorIdEntry = formData.get('transportadorId');
+    const destinadorIdEntry = formData.get('destinadorId');
+
+    if (
+      typeof geradorIdEntry !== 'string' ||
+      typeof transportadorIdEntry !== 'string' ||
+      typeof destinadorIdEntry !== 'string'
+    ) {
+      return; // Invalid input type
+    }
+
+    const geradorId = geradorIdEntry.trim();
+    const transportadorId = transportadorIdEntry.trim();
+    const destinadorId = destinadorIdEntry.trim();
+
+    if (!geradorId || !transportadorId || !destinadorId ||
+        geradorId.length > 50 || transportadorId.length > 50 || destinadorId.length > 50) {
+      return; // Invalid length (prevent DoS/Prisma errors)
+    }
 
     const result = await sinirClient.emitirMTR({
       geradorId,
