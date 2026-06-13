@@ -1,0 +1,4 @@
+## 2025-02-14 - Fix Server Action FormData Type Bypass
+**Vulnerability:** Server Actions blindly casting `formData.get()` to string (`as string`). This is dangerous because `formData.get()` can return a `File` object. Blind casting bypasses TypeScript's safety, potentially leading to application crashes or ORM errors if a malicious client submits a file instead of text. Additionally, missing input length validation exposes the application to DoS attacks via oversized payloads.
+**Learning:** Always explicitly validate the `typeof` form data entries in Next.js Server Actions. Do not rely on type assertions (`as Type`) for boundary inputs.
+**Prevention:** Created a `getValidString(formData, key, maxLength)` utility function to safely extract, type-check, and enforce length constraints on form inputs before processing them.
