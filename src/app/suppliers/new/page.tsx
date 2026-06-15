@@ -1,15 +1,17 @@
 import { redirect } from 'next/navigation';
 import prisma from '@/lib/prisma';
 import Link from 'next/link';
+import { getValidString } from '@/lib/validation';
 
 export default function NewSupplierPage() {
   async function createSupplier(formData: FormData) {
     'use server';
 
-    const name = formData.get('name') as string;
-    const email = formData.get('email') as string;
-    const phone = formData.get('phone') as string;
-    const document = formData.get('document') as string;
+    // Sentinel: Use getValidString to prevent File object bypass and enforce length constraints
+    const name = getValidString(formData, 'name', 100);
+    const email = getValidString(formData, 'email', 255);
+    const phone = getValidString(formData, 'phone', 20);
+    const document = getValidString(formData, 'document', 20);
 
     if (!name) return;
 

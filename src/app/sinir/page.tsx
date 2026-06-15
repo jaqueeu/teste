@@ -1,5 +1,6 @@
 import { sinirClient } from '@/lib/sinir/api';
 import prisma from '@/lib/prisma';
+import { getValidString } from '@/lib/validation';
 
 export default async function SinirPage() {
   const clients = await prisma.client.findMany();
@@ -8,9 +9,10 @@ export default async function SinirPage() {
   async function handleEmitirMTR(formData: FormData) {
     'use server';
 
-    const geradorId = formData.get('geradorId') as string;
-    const transportadorId = formData.get('transportadorId') as string;
-    const destinadorId = formData.get('destinadorId') as string;
+    // Sentinel: Use getValidString to prevent File object bypass
+    const geradorId = getValidString(formData, 'geradorId', 50);
+    const transportadorId = getValidString(formData, 'transportadorId', 50);
+    const destinadorId = getValidString(formData, 'destinadorId', 50);
 
     const result = await sinirClient.emitirMTR({
       geradorId,
