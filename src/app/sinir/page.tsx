@@ -1,5 +1,6 @@
 import { sinirClient } from '@/lib/sinir/api';
 import prisma from '@/lib/prisma';
+import { getValidString } from '@/lib/validation';
 
 export default async function SinirPage() {
   const clients = await prisma.client.findMany();
@@ -8,9 +9,11 @@ export default async function SinirPage() {
   async function handleEmitirMTR(formData: FormData) {
     'use server';
 
-    const geradorId = formData.get('geradorId') as string;
-    const transportadorId = formData.get('transportadorId') as string;
-    const destinadorId = formData.get('destinadorId') as string;
+    const geradorId = getValidString(formData, 'geradorId');
+    const transportadorId = getValidString(formData, 'transportadorId');
+    const destinadorId = getValidString(formData, 'destinadorId');
+
+    if (!geradorId || !transportadorId || !destinadorId) return;
 
     const result = await sinirClient.emitirMTR({
       geradorId,
