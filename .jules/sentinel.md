@@ -1,0 +1,4 @@
+## 2024-05-18 - [Form Input Validation]
+**Vulnerability:** Next.js Server Actions receiving `FormData` were blindly typecasting values `as string`. Since `formData.get()` can return either a string or a `File`, an attacker could upload a File instead of passing a string, bypassing the type check, and causing runtime errors or unexpected database operations. In addition, no explicit string length validation was enforced, creating a risk of database-level errors or potential DoS via large payloads.
+**Learning:** In Next.js Server Actions handling form inputs, typecasting with `as string` is unsafe because it circumvents TypeScript and assumes user input is always a string.
+**Prevention:** Created a `getValidString` utility that strictly checks `typeof === "string"`, enforces string length limits, and prevents `File` objects from being processed where strings are expected.
