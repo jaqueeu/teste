@@ -1,0 +1,4 @@
+## 2024-06-24 - Missing Input Validation on Server Actions
+**Vulnerability:** FormData values were being unsafely cast to string (`formData.get('key') as string`) in Server Actions. This is a vulnerability because `formData.get()` can return a `File` object. If a malicious user sends a file instead of a string, it bypasses the type check, potentially causing runtime crashes, DoS, or Prisma database errors.
+**Learning:** Next.js Server Actions with `FormData` must explicitly validate types and lengths. Simply casting with `as string` is dangerous and creates a false sense of security.
+**Prevention:** Always use a utility function (like `getValidString`) that explicitly checks `typeof value === 'string'` and enforces maximum length constraints before using `FormData` values in backend logic or database operations.
