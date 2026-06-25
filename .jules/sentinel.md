@@ -1,0 +1,7 @@
+## 2024-06-25 - Unsafe FormData Type Casting in Server Actions
+
+**Vulnerability:** The codebase was casting the results of `formData.get('key')` directly to `as string` in Next.js Server Actions. This is a critical security issue because `formData.get()` can return a `File` object if the client submits a file instead of text. Blindly casting `File as string` bypasses TypeScript's safety checks, and passing an object (like a `File`) to operations that expect a primitive string (like Prisma ORM queries) can lead to application crashes, unexpected behavior, Denial of Service (DoS), or potentially exposing internal database errors depending on how the ORM handles invalid object input.
+
+**Learning:** TypeScript type assertions (`as Type`) are dangerous at runtime boundaries like Server Actions where the shape of incoming data is controlled by the user. Next.js `FormData` specifically requires careful handling because it natively supports both `string` and `File` types.
+
+**Prevention:** Always explicitly check `typeof formData.get('key') === 'string'` before using the value. Never use `as string` on `FormData` values. Implemented a reusable utility function `getValidString(formData, key, maxLength)` in `src/lib/validation.ts` that enforces type checking and adds a maximum length constraint to further protect against DoS attacks via extremely large string payloads.
