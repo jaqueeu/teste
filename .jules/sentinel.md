@@ -1,0 +1,4 @@
+## 2024-11-23 - Prevent DoS via FormData File Objects in Next.js Server Actions
+**Vulnerability:** Next.js Server Actions receiving `FormData` were vulnerable to Application DoS. `formData.get()` can return a `File` object, but code was blindly casting it using `as string`. When a user maliciously uploads a file instead of providing a string, Prisma throws an unhandled error or the app crashes because a `File` is not a string.
+**Learning:** `formData.get()` in Next.js/Web API returns `FormDataEntryValue` which is `string | File`. Using `as string` overrides TypeScript's safety, bypassing type checking at runtime.
+**Prevention:** Never use `as string` on `formData.get()`. Always use an explicit `typeof` check or a reusable utility like `getValidString` to safely extract and type-check string values, while additionally enforcing length limits.
