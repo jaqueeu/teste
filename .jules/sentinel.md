@@ -1,0 +1,4 @@
+## 2025-02-23 - Prevent DoS and DB Crashes in Next.js Server Actions Form Data Parsing
+**Vulnerability:** Next.js Server Actions `formData.get('field') as string` casting is unsafe. A malicious user can send a `File` object via a multipart form request which bypasses the TS string casting at runtime. This can lead to unhandled exceptions when passing to Prisma or excessive memory use/DoS if large files are processed as strings.
+**Learning:** `FormDataEntryValue` can be either a `string` or `File`. Type casting using `as string` provides a false sense of security in Next.js Server Actions, blinding developers to runtime type mismatches.
+**Prevention:** Always use a utility function like `getValidString(val, maxLength)` that strictly checks `typeof val === 'string'` and enforces reasonable length limits before processing inputs from `FormData`.
