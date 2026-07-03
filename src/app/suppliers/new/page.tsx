@@ -1,15 +1,16 @@
 import { redirect } from 'next/navigation';
 import prisma from '@/lib/prisma';
 import Link from 'next/link';
+import { getValidString } from '@/lib/validation';
 
 export default function NewSupplierPage() {
   async function createSupplier(formData: FormData) {
     'use server';
 
-    const name = formData.get('name') as string;
-    const email = formData.get('email') as string;
-    const phone = formData.get('phone') as string;
-    const document = formData.get('document') as string;
+    const name = getValidString(formData, 'name', 100);
+    const email = getValidString(formData, 'email', 255);
+    const phone = getValidString(formData, 'phone', 50);
+    const document = getValidString(formData, 'document', 50);
 
     if (!name) return;
 
