@@ -1,0 +1,4 @@
+## 2024-07-07 - Unsafe FormData type casting and lack of length validation in Server Actions
+**Vulnerability:** Next.js Server Actions were blindly casting `FormData.get()` results using `as string`. Since `FormData.get()` can return a `File` object, an attacker could submit a file instead of a string, bypassing type checks. Furthermore, lack of length limits on string inputs could lead to Denial of Service (DoS) or Prisma database errors if excessively large strings were submitted.
+**Learning:** Always explicitly check `typeof` for `formData.get()` returns to ensure they are strings before processing, and enforce length constraints on user inputs to prevent resource exhaustion or database-level errors.
+**Prevention:** Implement and use a central validation utility, such as `getValidString(formData, key, maxLength)`, which verifies the type is string and enforces a strict maximum length (e.g., 255 characters) for all form string inputs.
