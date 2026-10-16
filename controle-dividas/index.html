@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controle de Dívidas</title>
+<style>
+  :root {
+    --bg: #f4f6f9; --card: #ffffff; --text: #1b2430; --muted: #66727f; --border: #dfe4ea;
+    --primary: #2563eb; --primary-text: #ffffff; --danger: #dc2626; --ok: #15803d; --warn: #b45309;
+    --ok-bg: #dcfce7; --danger-bg: #fee2e2; --warn-bg: #fef3c7; --info-bg: #dbeafe;
+    --shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11151b; --card: #1a2029; --text: #e6eaf0; --muted: #98a3b0; --border: #2c3542;
+      --primary: #3b82f6; --danger: #f87171; --ok: #4ade80; --warn: #fbbf24;
+      --ok-bg: #12351f; --danger-bg: #3d1717; --warn-bg: #3a2c0c; --info-bg: #172a4a;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { background: var(--card); border-bottom: 1px solid var(--border); }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  header .wrap { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+  h1 { font-size: 20px; margin: 0; }
+  h2 { font-size: 17px; margin: 28px 0 12px; }
+  button, .btn { font: inherit; border: 1px solid var(--border); background: var(--card); color: var(--text); padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+  button:hover { filter: brightness(.96); }
+  button.primary { background: var(--primary); color: var(--primary-text); border-color: var(--primary); }
+  button.danger { color: var(--danger); }
+  button.small { padding: 4px 10px; font-size: 13px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 16px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .stat .label { color: var(--muted); font-size: 13px; }
+  .stat .value { font-size: 22px; font-weight: 650; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .stat .hint { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .stat.alert .value { color: var(--danger); }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  .table-card { padding: 4px 6px; overflow-x: auto; }
+  .badge { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+  .b-paid { background: var(--ok-bg); color: var(--ok); }
+  .b-late { background: var(--danger-bg); color: var(--danger); }
+  .b-soon { background: var(--warn-bg); color: var(--warn); }
+  .b-open, .b-type { background: var(--info-bg); color: var(--primary); }
+  .filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .filters button.active { background: var(--primary); color: var(--primary-text); border-color: var(--primary); }
+  .debts { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+  .debt { cursor: pointer; }
+  .debt:hover { border-color: var(--primary); }
+  .debt .top { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
+  .debt .name { font-weight: 650; font-size: 16px; }
+  .debt .inst { color: var(--muted); font-size: 13px; }
+  .debt .row { display: flex; justify-content: space-between; font-size: 14px; margin-top: 6px; }
+  .debt .row span:first-child { color: var(--muted); }
+  .bar { height: 8px; background: var(--border); border-radius: 99px; overflow: hidden; margin-top: 10px; }
+  .bar > div { height: 100%; background: var(--ok); }
+  .empty { color: var(--muted); text-align: center; padding: 24px; }
+  dialog { border: 1px solid var(--border); border-radius: 14px; padding: 0; background: var(--card); color: var(--text); width: min(720px, calc(100vw - 24px)); max-height: calc(100vh - 32px); }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  .dlg-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--card); z-index: 1; }
+  .dlg-head h3 { margin: 0; font-size: 17px; }
+  .dlg-body { padding: 16px 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+  @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
+  .full { grid-column: 1 / -1; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  input, select, textarea { width: 100%; font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
+  textarea { min-height: 60px; resize: vertical; }
+  .help { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .info-grid div span { display: block; color: var(--muted); font-size: 12px; }
+  .info-grid div b { font-variant-numeric: tabular-nums; }
+  .inline-form { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; margin: 12px 0; }
+  .inline-form > div { flex: 1 1 160px; }
+  .muted { color: var(--muted); }
+  .notes { white-space: pre-wrap; background: var(--bg); padding: 8px 10px; border-radius: 8px; margin-bottom: 12px; font-size: 14px; }
+  @media (max-width: 560px) { #upcoming .hide-sm { display: none; } th, td { padding: 8px 6px; } }
+  footer { color: var(--muted); font-size: 12px; text-align: center; padding: 24px 16px 40px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>💰 Controle de Dívidas</h1>
+    <div class="actions">
+      <button class="primary" id="btn-new">+ Novo compromisso</button>
+      <button id="btn-export" title="Baixar um arquivo com todos os seus dados">Fazer backup</button>
+      <button id="btn-import" title="Carregar um arquivo de backup">Restaurar backup</button>
+      <input type="file" id="file-import" accept="application/json,.json" hidden>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="cards" id="summary"></section>
+
+  <h2>Próximos vencimentos <span class="muted" style="font-weight:400;font-size:13px">(em atraso e próximos 45 dias)</span></h2>
+  <div class="card table-card" id="upcoming"></div>
+
+  <h2>Meus compromissos</h2>
+  <div class="filters" id="filters"></div>
+  <div class="debts" id="debts"></div>
+</main>
+
+<footer>Os dados ficam salvos apenas neste navegador. Faça backup de vez em quando para não perder nada.</footer>
+
+<!-- Formulário de cadastro/edição -->
+<dialog id="dlg-form">
+  <form id="debt-form" method="dialog">
+    <div class="dlg-head"><h3 id="form-title">Novo compromisso</h3><button type="button" class="small" data-close>✕</button></div>
+    <div class="dlg-body grid2">
+      <div class="full"><label for="f-name">Nome *</label><input id="f-name" required placeholder="Ex.: Consórcio do carro, Financiamento do apê"></div>
+      <div><label for="f-type">Tipo *</label>
+        <select id="f-type"></select></div>
+      <div><label for="f-inst">Banco / administradora</label><input id="f-inst" placeholder="Ex.: Caixa, Porto Seguro"></div>
+      <div><label for="f-value">Valor da parcela (R$) *</label><input id="f-value" required inputmode="decimal" placeholder="Ex.: 850,00"></div>
+      <div><label for="f-freq">Periodicidade *</label><select id="f-freq"></select></div>
+      <div class="schedule"><label for="f-total">Quantidade de parcelas *</label><input id="f-total" type="number" min="1" max="600" required></div>
+      <div class="schedule"><label for="f-first">Vencimento da 1ª parcela *</label><input id="f-first" type="date" required></div>
+      <div class="schedule"><label for="f-paid">Parcelas já pagas</label><input id="f-paid" type="number" min="0" value="0">
+        <div class="help">As primeiras parcelas serão marcadas como pagas.</div></div>
+      <div><label for="f-total-value">Valor total do contrato / carta (R$)</label><input id="f-total-value" inputmode="decimal" placeholder="Opcional">
+        <div class="help">Valor do bem, crédito ou empréstimo contratado.</div></div>
+      <div class="full" id="edit-hint" hidden><div class="help">Para mudar o valor das parcelas, use “Reajustar parcelas em aberto” na tela do compromisso. Quantidade, periodicidade e datas não podem ser alteradas depois do cadastro.</div></div>
+      <div class="full"><label for="f-notes">Observações</label><textarea id="f-notes" placeholder="Ex.: número do contrato, grupo/cota do consórcio, dia de débito automático"></textarea></div>
+      <div class="full actions" style="justify-content:flex-end"><button type="button" data-close>Cancelar</button><button class="primary" type="submit">Salvar</button></div>
+    </div>
+  </form>
+</dialog>
+
+<!-- Detalhes de um compromisso -->
+<dialog id="dlg-detail">
+  <div class="dlg-head"><h3 id="detail-title"></h3><button type="button" class="small" data-close>✕</button></div>
+  <div class="dlg-body" id="detail-body"></div>
+</dialog>
+
+<script>
+"use strict";
+
+const STORAGE_KEY = "controle-dividas-v1";
+
+const TYPES = {
+  CONSORCIO: "Consórcio",
+  EMPRESTIMO: "Empréstimo",
+  FINANCIAMENTO: "Financiamento",
+  CARTAO: "Parcelamento no cartão",
+  OUTRO: "Outro",
+};
+
+// Periodicidade => intervalo em meses
+const FREQS = {
+  1: "Mensal", 2: "Bimestral", 3: "Trimestral", 6: "Semestral", 12: "Anual",
+};
+
+// ---------- Utilidades ----------
+const $ = (sel) => document.querySelector(sel);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const money = (cents) => brl.format((cents || 0) / 100);
+
+// Aceita "1.234,56", "1234,56", "1234.56" e "R$ 1.234,56"
+function parseMoney(str) {
+  let s = String(str || "").replace(/[R$\s]/g, "");
+  if (!s) return null;
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  const n = Number(s);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null;
+}
+const centsToInput = (c) => (c == null ? "" : (c / 100).toFixed(2).replace(".", ","));
+
+// Datas sempre como texto "AAAA-MM-DD" para evitar problemas de fuso horário
+function todayYMD() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function addMonths(ymd, months) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const total = (m - 1) + months;
+  const ny = y + Math.floor(total / 12);
+  const nm = ((total % 12) + 12) % 12;
+  const lastDay = new Date(ny, nm + 1, 0).getDate();
+  return `${ny}-${String(nm + 1).padStart(2, "0")}-${String(Math.min(d, lastDay)).padStart(2, "0")}`;
+}
+function addDays(ymd, days) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(y, m - 1, d + days);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+}
+const fmtDate = (ymd) => (ymd ? ymd.split("-").reverse().join("/") : "—");
+const monthKey = (ymd) => ymd.slice(0, 7);
+
+// ---------- Dados ----------
+let state = load();
+let filter = "TODOS";
+let openDebtId = null;
+
+function load() {
+  try {
+    const data = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (data && Array.isArray(data.debts)) return data;
+  } catch (e) { /* dados inválidos ou armazenamento bloqueado */ }
+  return { debts: [] };
+}
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    alert("Não foi possível salvar os dados neste navegador. Faça um backup para não perder as alterações.");
+  }
+  render();
+}
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const findDebt = (id) => state.debts.find((d) => d.id === id);
+
+function buildInstallments(firstDue, count, freqMonths, cents, alreadyPaid) {
+  const list = [];
+  for (let i = 0; i < count; i++) {
+    const due = addMonths(firstDue, i * freqMonths);
+    list.push({ n: i + 1, due, cents, paid: i < alreadyPaid ? due : null });
+  }
+  return list;
+}
+
+function statusOf(inst, today) {
+  if (inst.paid) return "paid";
+  if (inst.due < today) return "late";
+  if (inst.due <= addDays(today, 7)) return "soon";
+  return "open";
+}
+const STATUS_LABEL = { paid: "Paga", late: "Em atraso", soon: "Vence em breve", open: "Em aberto" };
+const badge = (st) => `<span class="badge b-${st}">${STATUS_LABEL[st]}</span>`;
+
+function debtStats(debt) {
+  const paid = debt.installments.filter((i) => i.paid);
+  const open = debt.installments.filter((i) => !i.paid);
+  const next = open[0] || null;
+  return {
+    paidCount: paid.length,
+    total: debt.installments.length,
+    paidCents: paid.reduce((s, i) => s + i.cents, 0),
+    remainingCents: open.reduce((s, i) => s + i.cents, 0),
+    next,
+    lastDue: open.length ? open[open.length - 1].due : null,
+    done: open.length === 0,
+  };
+}
+
+// ---------- Renderização ----------
+function render() {
+  const today = todayYMD();
+  renderSummary(today);
+  renderUpcoming(today);
+  renderFilters();
+  renderDebts(today);
+  if (openDebtId && $("#dlg-detail").open) renderDetail(openDebtId);
+}
+
+function renderSummary(today) {
+  const thisMonth = monthKey(today);
+  let monthCents = 0, monthCount = 0, monthPaidCents = 0, lateCents = 0, lateCount = 0, remaining = 0, monthlyEq = 0;
+  for (const d of state.debts) {
+    const open = d.installments.filter((i) => !i.paid);
+    if (open.length) monthlyEq += (open[0].cents) / d.freq;
+    for (const i of d.installments) {
+      if (monthKey(i.due) === thisMonth) {
+        if (i.paid) monthPaidCents += i.cents;
+        else { monthCents += i.cents; monthCount++; }
+      }
+      if (!i.paid) {
+        remaining += i.cents;
+        if (i.due < today) { lateCents += i.cents; lateCount++; }
+      }
+    }
+  }
+  const monthName = new Date().toLocaleDateString("pt-BR", { month: "long" });
+  $("#summary").innerHTML = `
+    <div class="card stat"><div class="label">Falta pagar em ${monthName}</div><div class="value">${money(monthCents)}</div>
+      <div class="hint">${monthCount} parcela(s) · já pago no mês: ${money(monthPaidCents)}</div></div>
+    <div class="card stat ${lateCount ? "alert" : ""}"><div class="label">Em atraso</div><div class="value">${money(lateCents)}</div>
+      <div class="hint">${lateCount} parcela(s) vencida(s)</div></div>
+    <div class="card stat"><div class="label">Custo mensal médio</div><div class="value">${money(Math.round(monthlyEq))}</div>
+      <div class="hint">parcelas anuais/semestrais divididas por mês</div></div>
+    <div class="card stat"><div class="label">Saldo total a pagar</div><div class="value">${money(remaining)}</div>
+      <div class="hint">soma de todas as parcelas em aberto</div></div>`;
+}
+
+function renderUpcoming(today) {
+  const limit = addDays(today, 45);
+  const rows = [];
+  for (const d of state.debts) {
+    for (const i of d.installments) {
+      if (!i.paid && i.due <= limit) rows.push({ d, i });
+    }
+  }
+  rows.sort((a, b) => a.i.due.localeCompare(b.i.due));
+  if (!rows.length) {
+    $("#upcoming").innerHTML = `<div class="empty">${state.debts.length ? "Nada vencendo nos próximos 45 dias. 🎉" : "Cadastre seu primeiro compromisso no botão “+ Novo compromisso”."}</div>`;
+    return;
+  }
+  $("#upcoming").innerHTML = `<table>
+    <thead><tr><th>Vencimento</th><th>Compromisso</th><th class="hide-sm">Parcela</th><th class="num">Valor</th><th class="hide-sm">Situação</th><th></th></tr></thead>
+    <tbody>${rows.map(({ d, i }) => `
+      <tr>
+        <td>${fmtDate(i.due)}</td>
+        <td><a href="#" data-open="${d.id}">${esc(d.name)}</a></td>
+        <td class="hide-sm">${i.n}/${d.installments.length}</td>
+        <td class="num">${money(i.cents)}</td>
+        <td class="hide-sm">${badge(statusOf(i, today))}</td>
+        <td class="num"><button class="small" data-pay="${d.id}:${i.n}">Marcar paga</button></td>
+      </tr>`).join("")}</tbody></table>`;
+}
+
+function renderFilters() {
+  const counts = { TODOS: state.debts.length };
+  for (const d of state.debts) counts[d.type] = (counts[d.type] || 0) + 1;
+  const opts = [["TODOS", "Todos"], ...Object.entries(TYPES).filter(([k]) => counts[k])];
+  if (filter !== "TODOS" && !counts[filter]) filter = "TODOS";
+  $("#filters").innerHTML = state.debts.length ? opts.map(([k, label]) =>
+    `<button class="small ${filter === k ? "active" : ""}" data-filter="${k}">${label} (${counts[k] || 0})</button>`).join("") : "";
+}
+
+function renderDebts(today) {
+  const list = state.debts
+    .filter((d) => filter === "TODOS" || d.type === filter)
+    .map((d) => ({ d, s: debtStats(d) }))
+    .sort((a, b) => (a.s.done - b.s.done) || (a.s.next?.due || "").localeCompare(b.s.next?.due || ""));
+  if (!list.length) { $("#debts").innerHTML = `<div class="empty card">Nenhum compromisso cadastrado ainda.</div>`; return; }
+  $("#debts").innerHTML = list.map(({ d, s }) => {
+    const pct = Math.round((s.paidCount / s.total) * 100);
+    const nextLine = s.done
+      ? `<span class="badge b-paid">Quitado ✓</span>`
+      : `${fmtDate(s.next.due)} ${statusOf(s.next, today) === "late" ? badge("late") : ""}`;
+    return `<div class="card debt" data-open="${d.id}" tabindex="0">
+      <div class="top"><div><div class="name">${esc(d.name)}</div><div class="inst">${esc(d.institution || "")}</div></div>
+        <span class="badge b-type">${TYPES[d.type]}</span></div>
+      <div class="row"><span>Parcela</span><b>${money(s.next ? s.next.cents : d.installments[d.installments.length - 1].cents)} · ${FREQS[d.freq].toLowerCase()}</b></div>
+      <div class="row"><span>Próximo vencimento</span><span>${nextLine}</span></div>
+      <div class="row"><span>Falta pagar</span><b>${money(s.remainingCents)}</b></div>
+      ${d.type === "CONSORCIO" ? `<div class="row"><span>Contemplado</span><span>${d.contemplated ? "Sim ✓" : "Ainda não"}</span></div>` : ""}
+      <div class="bar"><div style="width:${pct}%"></div></div>
+      <div class="row"><span>${s.paidCount} de ${s.total} pagas (${pct}%)</span><span class="muted">${s.lastDue ? "termina " + fmtDate(s.lastDue) : ""}</span></div>
+    </div>`;
+  }).join("");
+}
+
+function renderDetail(id) {
+  const d = findDebt(id);
+  if (!d) { $("#dlg-detail").close(); return; }
+  const today = todayYMD();
+  const s = debtStats(d);
+  $("#detail-title").textContent = d.name;
+  $("#detail-body").innerHTML = `
+    <div class="info-grid">
+      <div><span>Tipo</span><b>${TYPES[d.type]}</b></div>
+      <div><span>Instituição</span><b>${esc(d.institution || "—")}</b></div>
+      <div><span>Periodicidade</span><b>${FREQS[d.freq]}</b></div>
+      <div><span>Parcelas pagas</span><b>${s.paidCount} de ${s.total}</b></div>
+      <div><span>Total já pago</span><b>${money(s.paidCents)}</b></div>
+      <div><span>Falta pagar</span><b>${money(s.remainingCents)}</b></div>
+      <div><span>Previsão de quitação</span><b>${s.done ? "Quitado ✓" : fmtDate(s.lastDue)}</b></div>
+      ${d.totalValueCents != null ? `<div><span>Valor do contrato</span><b>${money(d.totalValueCents)}</b></div>` : ""}
+      ${d.type === "CONSORCIO" ? `<div><span>Contemplado</span><b>${d.contemplated ? "Sim ✓" : "Ainda não"}</b></div>` : ""}
+    </div>
+    ${d.notes ? `<div class="notes">${esc(d.notes)}</div>` : ""}
+    <div class="actions">
+      <button data-edit="${d.id}">Editar dados</button>
+      ${d.type === "CONSORCIO" ? `<button data-contemplate="${d.id}">${d.contemplated ? "Desmarcar contemplação" : "Marcar como contemplado"}</button>` : ""}
+      <button class="danger" data-delete="${d.id}">Excluir</button>
+    </div>
+    ${s.done ? "" : `
+    <form class="inline-form" id="adjust-form">
+      <div><label for="adj-value">Reajustar parcelas em aberto para (R$)</label><input id="adj-value" inputmode="decimal" placeholder="${centsToInput(s.next.cents)}"></div>
+      <div><label for="adj-from">A partir da parcela</label><input id="adj-from" type="number" min="${s.next.n}" max="${s.total}" value="${s.next.n}"></div>
+      <button type="submit">Aplicar reajuste</button>
+    </form>`}
+    <div class="table-card" style="padding:0">
+    <table>
+      <thead><tr><th>Nº</th><th>Vencimento</th><th class="num">Valor</th><th>Situação</th><th>Pago em</th><th></th></tr></thead>
+      <tbody>${d.installments.map((i) => {
+        const st = statusOf(i, today);
+        return `<tr>
+          <td>${i.n}</td><td>${fmtDate(i.due)}</td><td class="num">${money(i.cents)}</td><td>${badge(st)}</td>
+          <td>${i.paid ? fmtDate(i.paid) : ""}</td>
+          <td class="num">${i.paid
+            ? `<button class="small" data-unpay="${d.id}:${i.n}">Desfazer</button>`
+            : `<button class="small" data-pay="${d.id}:${i.n}">Marcar paga</button>`}</td>
+        </tr>`;
+      }).join("")}</tbody>
+    </table></div>`;
+}
+
+// ---------- Formulário ----------
+let editingId = null;
+
+function fillSelects() {
+  $("#f-type").innerHTML = Object.entries(TYPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
+  $("#f-freq").innerHTML = Object.entries(FREQS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
+}
+
+function openForm(id) {
+  editingId = id || null;
+  const d = id ? findDebt(id) : null;
+  $("#form-title").textContent = d ? "Editar compromisso" : "Novo compromisso";
+  $("#f-name").value = d?.name || "";
+  $("#f-type").value = d?.type || "CONSORCIO";
+  $("#f-inst").value = d?.institution || "";
+  $("#f-value").value = d ? centsToInput(debtStats(d).next?.cents ?? d.installments[0].cents) : "";
+  $("#f-freq").value = String(d?.freq || 1);
+  $("#f-total").value = d ? d.installments.length : "";
+  $("#f-first").value = d ? d.installments[0].due : todayYMD();
+  $("#f-paid").value = d ? debtStats(d).paidCount : 0;
+  $("#f-total-value").value = centsToInput(d?.totalValueCents);
+  $("#f-notes").value = d?.notes || "";
+  // Na edição, o cronograma não muda
+  for (const el of ["#f-value", "#f-freq", "#f-total", "#f-first", "#f-paid"]) {
+    $(el).disabled = !!d;
+    $(el).required = !d;
+  }
+  $("#edit-hint").hidden = !d;
+  $("#dlg-form").showModal();
+  $("#f-name").focus();
+}
+
+$("#debt-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const name = $("#f-name").value.trim();
+  if (!name) return alert("Informe o nome.");
+  const totalValueRaw = $("#f-total-value").value.trim();
+  const totalValueCents = totalValueRaw ? parseMoney(totalValueRaw) : null;
+  if (totalValueRaw && totalValueCents == null) return alert("Valor total inválido.");
+  const common = {
+    name,
+    type: $("#f-type").value,
+    institution: $("#f-inst").value.trim(),
+    totalValueCents,
+    notes: $("#f-notes").value.trim(),
+  };
+
+  if (editingId) {
+    Object.assign(findDebt(editingId), common);
+  } else {
+    const cents = parseMoney($("#f-value").value);
+    const total = parseInt($("#f-total").value, 10);
+    const paid = parseInt($("#f-paid").value || "0", 10);
+    const freq = parseInt($("#f-freq").value, 10);
+    const first = $("#f-first").value;
+    if (!cents) return alert("Informe um valor de parcela válido. Ex.: 850,00");
+    if (!(total >= 1 && total <= 600)) return alert("A quantidade de parcelas deve ser entre 1 e 600.");
+    if (!(paid >= 0 && paid <= total)) return alert("Parcelas já pagas não pode ser maior que o total.");
+    if (!first) return alert("Informe a data da 1ª parcela.");
+    state.debts.push({
+      id: newId(), ...common, freq, contemplated: false,
+      createdAt: new Date().toISOString(),
+      installments: buildInstallments(first, total, freq, cents, paid),
+    });
+  }
+  $("#dlg-form").close();
+  save();
+});
+
+// ---------- Ações (delegação de eventos) ----------
+function getInst(ref) {
+  const [id, n] = ref.split(":");
+  const d = findDebt(id);
+  return d ? d.installments.find((i) => i.n === Number(n)) : null;
+}
+
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-pay],[data-unpay],[data-open],[data-edit],[data-delete],[data-contemplate],[data-filter],[data-close]");
+  if (!t) return;
+  const ds = t.dataset;
+  if (ds.pay) {
+    e.stopPropagation();
+    const i = getInst(ds.pay);
+    if (i) { i.paid = todayYMD(); save(); }
+  } else if (ds.unpay) {
+    const i = getInst(ds.unpay);
+    if (i) { i.paid = null; save(); }
+  } else if (ds.open) {
+    e.preventDefault();
+    openDebtId = ds.open;
+    renderDetail(ds.open);
+    if (!$("#dlg-detail").open) $("#dlg-detail").showModal();
+  } else if (ds.edit) {
+    $("#dlg-detail").close();
+    openForm(ds.edit);
+  } else if (ds.delete) {
+    const d = findDebt(ds.delete);
+    if (d && confirm(`Excluir “${d.name}” e todas as suas parcelas? Isso não pode ser desfeito.`)) {
+      state.debts = state.debts.filter((x) => x.id !== d.id);
+      $("#dlg-detail").close();
+      save();
+    }
+  } else if (ds.contemplate) {
+    const d = findDebt(ds.contemplate);
+    if (d) { d.contemplated = !d.contemplated; save(); }
+  } else if (ds.filter) {
+    filter = ds.filter;
+    render();
+  } else if ("close" in ds) {
+    t.closest("dialog").close();
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && e.target.matches(".debt[data-open]")) e.target.click();
+});
+
+document.addEventListener("submit", (e) => {
+  if (e.target.id !== "adjust-form") return;
+  e.preventDefault();
+  const d = findDebt(openDebtId);
+  const cents = parseMoney($("#adj-value").value);
+  const from = parseInt($("#adj-from").value, 10);
+  if (!d || !cents) return alert("Informe o novo valor da parcela. Ex.: 912,40");
+  let changed = 0;
+  for (const i of d.installments) {
+    if (!i.paid && i.n >= from) { i.cents = cents; changed++; }
+  }
+  if (!changed) return alert("Nenhuma parcela em aberto a partir desse número.");
+  save();
+});
+
+// ---------- Backup ----------
+$("#btn-new").addEventListener("click", () => openForm());
+$("#btn-export").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `backup-dividas-${todayYMD()}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$("#btn-import").addEventListener("click", () => $("#file-import").click());
+$("#file-import").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (!data || !Array.isArray(data.debts)) throw new Error("formato");
+    if (!confirm(`Restaurar ${data.debts.length} compromisso(s)? Os dados atuais serão substituídos.`)) return;
+    state = data;
+    save();
+  } catch (err) {
+    alert("Arquivo de backup inválido.");
+  }
+});
+
+fillSelects();
+render();
+</script>
+</body>
+</html>
