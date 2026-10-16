@@ -77,6 +77,9 @@
   .seg input { width: auto; }
   .pair { display: flex; gap: 6px; }
   .pair select { width: auto; }
+  .charge-row { display: grid; grid-template-columns: 1.4fr 1fr .8fr auto; gap: 6px; margin-bottom: 6px; }
+  @media (max-width: 560px) { .charge-row { grid-template-columns: 1fr 1fr; } .charge-row .ch-name { grid-column: 1 / -1; } }
+  .sub { display: block; font-size: 12px; color: var(--muted); font-weight: 400; white-space: nowrap; }
   .preview { background: var(--info-bg); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
   .preview:empty { display: none; }
   .preview b { font-variant-numeric: tabular-nums; }
@@ -157,8 +160,12 @@
         <div class="cons-only"><label for="f-adm">Taxa de administração total (%) *</label><input id="f-adm" inputmode="decimal" placeholder="Ex.: 16">
           <div class="help">Percentual sobre a carta, no prazo todo.</div></div>
         <div class="cons-only"><label for="f-fr">Fundo de reserva (%)</label><input id="f-fr" inputmode="decimal" placeholder="Ex.: 2"></div>
-        <div><label for="f-fee">Seguros e tarifas por parcela (R$)</label><input id="f-fee" inputmode="decimal" placeholder="Opcional">
-          <div class="help">Valor fixo somado a cada parcela (ex.: seguro MIP/DFI, tarifa).</div></div>
+        <div class="loan-only"><label for="f-upfront">Custos da contratação financiados junto (R$)</label><input id="f-upfront" inputmode="decimal" placeholder="Opcional">
+          <div class="help">IOF, tarifa de cadastro, seguro pago à vista… que o banco somou ao valor financiado.</div></div>
+        <div class="full"><label>Seguros e tarifas cobrados junto com as parcelas</label>
+          <div id="charges-list"></div>
+          <button type="button" class="small" id="btn-add-charge">+ Adicionar seguro ou tarifa</button>
+          <div class="help">Ex.: Seguro MIP (% do saldo devedor), Seguro DFI (R$ fixo), Tarifa de administração (R$ fixo), Seguro prestamista (% do saldo).</div></div>
         <div class="full preview" id="calc-preview"></div>
       </div>
 
@@ -279,37 +286,69 @@ function periodRate(ratePct, unit, freqMonths) {
 
 // Tabela Price: prestação fixa; juros sobre o saldo devedor, o resto amortiza.
 // SAC: amortização fixa; juros sobre o saldo devedor, parcelas decrescentes.
-function loanSchedule({ principalCents: P, n, rate: i, system, feeCents = 0 }) {
+function loanSchedule({ principalCents: P, n, rate: i, system, charges = [] }) {
   const rows = [];
   let balance = P;
   const pmt = i > 0 ? (P * i) / (1 - Math.pow(1 + i, -n)) : P / n;
   for (let k = 0; k < n; k++) {
     const interest = Math.round(balance * i);
+    const ch = chargesFor(charges, balance);
     let amort;
     if (k === n - 1) amort = balance; // última parcela zera o saldo (ajuste de centavos)
     else if (system === "SAC") amort = Math.round((P * (k + 1)) / n) - Math.round((P * k) / n);
     else amort = Math.round(pmt) - interest;
     balance -= amort;
-    rows.push({ cents: amort + interest + feeCents, amort, interest, fees: feeCents, balance });
+    rows.push({ cents: amort + interest + ch.fees, amort, interest, fees: ch.fees, feeDetail: ch.detail, balance });
   }
   return rows;
 }
 
+// Seguros e tarifas recorrentes: valor fixo por parcela ou % sobre o saldo devedor
+// charges: [{ name, kind: "fixed" | "pct", value }] — value em centavos (fixed) ou em % (pct)
+function chargesFor(charges, balanceBefore) {
+  const detail = [];
+  for (const c of charges) {
+    const cents = c.kind === "pct" ? Math.round(balanceBefore * c.value / 100) : c.value;
+    if (cents) detail.push({ name: c.name, cents });
+  }
+  return { fees: sumOf(detail, "cents"), detail };
+}
+const chargesOf = (calc) => calc.charges || (calc.feeCents ? [{ name: "Seguros e tarifas", kind: "fixed", value: calc.feeCents }] : []);
+const CHARGE_KINDS = { fixed: "R$ por parcela", pct: "% do saldo devedor" };
+
+// CET: taxa que iguala o valor liberado às parcelas pagas (inclui juros, seguros e tarifas)
+function cetRate(releasedCents, rows) {
+  const npv = (r) => rows.reduce((s, row, k) => s + row.cents / Math.pow(1 + r, k + 1), 0) - releasedCents;
+  if (npv(0) <= 0) return 0;
+  let lo = 0, hi = 1;
+  while (npv(hi) > 0 && hi < 100) hi *= 2;
+  for (let it = 0; it < 100; it++) {
+    const mid = (lo + hi) / 2;
+    if (npv(mid) > 0) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+const toMonthly = (periodR, freq) => Math.pow(1 + periodR, 1 / freq) - 1;
+const toYearly = (monthlyR) => Math.pow(1 + monthlyR, 12) - 1;
+
 // Consórcio: (carta de crédito + taxa de administração + fundo de reserva) ÷ nº de parcelas
-function consortiumSchedule({ principalCents: P, n, admPct, frPct, feeCents = 0 }) {
+function consortiumSchedule({ principalCents: P, n, admPct, frPct, charges = [] }) {
   const rows = [];
   const extras = P * ((admPct + frPct) / 100);
   let balance = P;
   for (let k = 0; k < n; k++) {
     const amort = Math.round((P * (k + 1)) / n) - Math.round((P * k) / n);
-    const fees = Math.round((extras * (k + 1)) / n) - Math.round((extras * k) / n) + feeCents;
+    const adm = Math.round((extras * (k + 1)) / n) - Math.round((extras * k) / n);
+    const ch = chargesFor(charges, balance);
+    const feeDetail = [{ name: "Taxa de adm. + fundo de reserva", cents: adm }, ...ch.detail];
     balance -= amort;
-    rows.push({ cents: amort + fees, amort, interest: 0, fees, balance });
+    rows.push({ cents: amort + adm + ch.fees, amort, interest: 0, fees: adm + ch.fees, feeDetail, balance });
   }
   return rows;
 }
 
 const sumOf = (rows, key) => rows.reduce((s, r) => s + (r[key] || 0), 0);
+const extrasSum = (inst) => sumOf(inst.extras || [], "cents");
 
 // ---------- Amortização extraordinária ----------
 // Saldo devedor antes da próxima parcela em aberto (null se não houver detalhamento)
@@ -331,8 +370,8 @@ function simulateAmortization(d, extraCents, mode) {
   const B = currentBalance(d);
   if (B == null) return { error: "Este compromisso não tem o detalhamento de saldo devedor." };
   const rate = periodRate(c.ratePct, c.rateUnit, d.freq);
-  const fee = c.feeCents || 0;
-  const oldTotal = sumOf(open, "cents");
+  const charges = chargesOf(c);
+  const oldTotal = sumOf(open, "cents") - open.reduce((s, i) => s + extrasSum(i), 0);
 
   if (extraCents >= B) {
     return { startIdx, payoff: true, extra: B, rows: [], saving: oldTotal - B, oldCount: open.length };
@@ -340,18 +379,19 @@ function simulateAmortization(d, extraCents, mode) {
   const nb = B - extraCents;
   let rows;
   if (mode === "parcela") {
-    rows = loanSchedule({ principalCents: nb, n: open.length, rate, system: c.system, feeCents: fee });
+    rows = loanSchedule({ principalCents: nb, n: open.length, rate, system: c.system, charges });
   } else {
     rows = [];
     let bal = nb;
-    const pmt = open[0].cents - fee; // prestação sem seguros (Price)
+    const pmt = open[0].amort + open[0].interest; // prestação sem seguros/tarifas (Price)
     const amortFixed = open[0].amort; // amortização constante (SAC)
     while (bal > 0 && rows.length < 600) {
       const interest = Math.round(bal * rate);
       let amort = c.system === "SAC" ? amortFixed : pmt - interest;
       if (amort >= bal || amort <= 0) amort = bal;
+      const ch = chargesFor(charges, bal);
       bal -= amort;
-      rows.push({ cents: amort + interest + fee, amort, interest, fees: fee, balance: bal });
+      rows.push({ cents: amort + interest + ch.fees, amort, interest, fees: ch.fees, feeDetail: ch.detail, balance: bal });
     }
   }
   const newTotal = sumOf(rows, "cents");
@@ -367,7 +407,10 @@ function applyAmortization(d, sim, mode) {
   } else {
     sim.rows.forEach((row, k) => {
       const idx = sim.startIdx + k;
-      kept.push({ n: idx + 1, due: addMonths(d.installments[0].due, idx * d.freq), ...row, paid: null });
+      const inst = { n: idx + 1, due: addMonths(d.installments[0].due, idx * d.freq), ...row, paid: null };
+      const old = d.installments[idx]; // cobranças avulsas continuam na mesma parcela
+      if (old?.extras?.length) { inst.extras = old.extras; inst.cents += extrasSum(old); }
+      kept.push(inst);
     });
   }
   d.installments = kept;
@@ -392,7 +435,9 @@ function debtStats(debt) {
   return {
     paidCount: paid.length,
     total: debt.installments.length,
-    paidCents: paid.reduce((s, i) => s + i.cents, 0) + (debt.prepayments || []).reduce((s, p) => s + p.cents, 0),
+    paidCents: paid.reduce((s, i) => s + (i.paidCents ?? i.cents), 0) + (debt.prepayments || []).reduce((s, p) => s + p.cents, 0),
+    lateFeesCents: paid.reduce((s, i) => s + (i.paidCents != null ? i.paidCents - i.cents : 0), 0),
+    extrasCents: debt.installments.reduce((s, i) => s + extrasSum(i), 0),
     remainingCents: open.reduce((s, i) => s + i.cents, 0),
     next,
     lastDue: open.length ? open[open.length - 1].due : null,
@@ -516,7 +561,12 @@ function calcInfo(d, s) {
     out += `<div><span>Juros</span><b>${pct(+m.toFixed(4))} a.m. · ${pct(+a.toFixed(2))} a.a.</b></div>`;
     out += `<div><span>Total de juros (previsto)</span><b>${money(interestTotal)}</b></div>`;
   }
-  if (feesTotal) out += `<div><span>Total de taxas/seguros</span><b>${money(feesTotal)}</b></div>`;
+  if (c.upfrontCents) out += `<div><span>Custos da contratação financiados</span><b>${money(c.upfrontCents)}</b></div>`;
+  if (c.cetMonthly != null && c.system !== "CONSORCIO") out += `<div><span>CET (custo efetivo total)</span><b>${pct(+(c.cetMonthly * 100).toFixed(2))} a.m. · ${pct(+(toYearly(c.cetMonthly) * 100).toFixed(2))} a.a.</b></div>`;
+  const charges = chargesOf(c);
+  if (charges.length) out += `<div><span>Seguros e tarifas</span><b>${charges.map((ch) =>
+    `${esc(ch.name)}: ${ch.kind === "pct" ? pct(ch.value) + " do saldo" : money(ch.value)}`).join("<br>")}</b></div>`;
+  if (feesTotal) out += `<div><span>Total de taxas/seguros (previsto)</span><b>${money(feesTotal)}</b></div>`;
   if (balance != null && !s.done) out += `<div><span>${c.system === "CONSORCIO" ? "Falta do fundo comum" : "Saldo devedor atual"}</span><b>${money(balance)}</b></div>`;
   return out;
 }
@@ -549,6 +599,19 @@ function prepaymentHistory(d) {
     `${fmtDate(p.date)} — ${p.mode === "quitacao" ? `quitação de ${money(p.payoffCents)}` : `${money(p.cents)} ${MODE_LABEL[p.mode]}`}${p.saving > 0 ? ` · economia de ${money(p.saving)}` : ""}`).join("<br>")}</div>`;
 }
 
+const feeCell = (i) => `<td class="num" title="${esc((i.feeDetail || []).map((f) => `${f.name}: ${money(f.cents)}`).join("\n"))}">${i.fees == null ? "—" : money(i.fees)}</td>`;
+
+function extraChargeForm(d, s) {
+  if (s.done) return "";
+  return `<form class="inline-form" id="charge-form">
+    <div><label for="ex-desc">Cobrança extra (descrição)</label><input id="ex-desc" placeholder="Ex.: Tarifa anual, seguro do carro"></div>
+    <div><label for="ex-value">Valor (R$)</label><input id="ex-value" inputmode="decimal" placeholder="Ex.: 120,00"></div>
+    <div><label for="ex-n">Na parcela nº</label><input id="ex-n" type="number" min="${s.next.n}" max="${s.total}" value="${s.next.n}"></div>
+    <div style="flex:0 0 auto"><label style="display:flex;gap:6px;align-items:center;color:var(--text);font-size:14px;margin:0;padding:8px 0"><input type="checkbox" id="ex-repeat" style="width:auto"> repetir nas seguintes</label></div>
+    <button type="submit">Adicionar cobrança</button>
+  </form>`;
+}
+
 function renderDetail(id) {
   const d = findDebt(id);
   if (!d) { $("#dlg-detail").close(); return; }
@@ -563,6 +626,8 @@ function renderDetail(id) {
       <div><span>Periodicidade</span><b>${FREQS[d.freq]}</b></div>
       <div><span>Parcelas pagas</span><b>${s.paidCount} de ${s.total}</b></div>
       <div><span>Total já pago</span><b>${money(s.paidCents)}</b></div>
+      ${s.lateFeesCents > 0 ? `<div><span>Multas/juros por atraso pagos</span><b>${money(s.lateFeesCents)}</b></div>` : ""}
+      ${s.extrasCents > 0 ? `<div><span>Cobranças avulsas</span><b>${money(s.extrasCents)}</b></div>` : ""}
       <div><span>Falta pagar</span><b>${money(s.remainingCents)}</b></div>
       <div><span>Previsão de quitação</span><b>${s.done ? "Quitado ✓" : fmtDate(s.lastDue)}</b></div>
       ${d.totalValueCents != null ? `<div><span>${d.type === "CONSORCIO" ? "Carta de crédito" : "Valor do contrato"}</span><b>${money(d.totalValueCents)}</b></div>` : ""}
@@ -576,6 +641,7 @@ function renderDetail(id) {
       <button class="danger" data-delete="${d.id}">Excluir</button>
     </div>
     ${extraForms(d, s)}
+    ${extraChargeForm(d, s)}
     ${prepaymentHistory(d)}
     ${s.done || canAmortize(d) ? "" : `
     <form class="inline-form" id="adjust-form">
@@ -592,10 +658,11 @@ function renderDetail(id) {
         const st = statusOf(i, today);
         const part = (v) => `<td class="num">${v == null ? "—" : money(v)}</td>`;
         return `<tr>
-          <td>${i.n}</td><td>${fmtDate(i.due)}</td><td class="num"><b>${money(i.cents)}</b></td>
-          ${hasBreakdown ? part(i.amort) + part(i.interest) + part(i.fees) + part(i.balance) : ""}
+          <td>${i.n}</td><td>${fmtDate(i.due)}</td>
+          <td class="num"><b>${money(i.cents)}</b>${(i.extras || []).map((x, k) => `<span class="sub">inclui ${money(x.cents)} de ${esc(x.desc)}${i.paid ? "" : ` <a href="#" data-rmextra="${d.id}:${i.n}:${k}" title="Remover cobrança">✕</a>`}</span>`).join("")}</td>
+          ${hasBreakdown ? part(i.amort) + part(i.interest) + feeCell(i) + part(i.balance) : ""}
           <td>${badge(st)}</td>
-          <td>${i.paid ? fmtDate(i.paid) : ""}</td>
+          <td>${i.paid ? fmtDate(i.paid) : ""}${i.paidCents != null ? `<span class="sub">pago ${money(i.paidCents)}${i.paidCents > i.cents ? ` (+${money(i.paidCents - i.cents)} multa/juros)` : ""}</span>` : ""}</td>
           <td class="num">${i.paid
             ? `<button class="small" data-unpay="${d.id}:${i.n}">Desfazer</button>`
             : `<button class="small" data-pay="${d.id}:${i.n}">Marcar paga</button>`}</td>
@@ -627,7 +694,8 @@ function openForm(id) {
   $("#f-total-value").value = centsToInput(d?.totalValueCents);
   $("#f-notes").value = d?.notes || "";
   if (!d) {
-    for (const el of ["#f-principal", "#f-rate", "#f-adm", "#f-fr", "#f-fee"]) $(el).value = "";
+    for (const el of ["#f-principal", "#f-rate", "#f-adm", "#f-fr", "#f-upfront"]) $(el).value = "";
+    $("#charges-list").innerHTML = "";
     $("#f-system").value = "PRICE";
     $("#f-rate-unit").value = "am";
     document.querySelector('input[name="mode"][value="calc"]').checked = true;
@@ -638,6 +706,35 @@ function openForm(id) {
   updateFormVisibility();
   $("#dlg-form").showModal();
   $("#f-name").focus();
+}
+
+function addChargeRow() {
+  const row = document.createElement("div");
+  row.className = "charge-row";
+  row.innerHTML = `<input class="ch-name" placeholder="Nome (ex.: Seguro MIP)" aria-label="Nome do seguro ou tarifa">
+    <select class="ch-kind" aria-label="Tipo de cobrança">${Object.entries(CHARGE_KINDS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select>
+    <input class="ch-value" inputmode="decimal" placeholder="Valor" aria-label="Valor">
+    <button type="button" class="small danger" data-remove-charge title="Remover">✕</button>`;
+  $("#charges-list").append(row);
+  row.querySelector(".ch-name").focus();
+}
+$("#btn-add-charge").addEventListener("click", addChargeRow);
+$("#charges-list").addEventListener("click", (e) => {
+  if (e.target.matches("[data-remove-charge]")) { e.target.closest(".charge-row").remove(); updatePreview(); }
+});
+
+function readCharges() {
+  const charges = [];
+  for (const row of document.querySelectorAll("#charges-list .charge-row")) {
+    const raw = row.querySelector(".ch-value").value.trim();
+    if (!raw) continue;
+    const kind = row.querySelector(".ch-kind").value;
+    const name = row.querySelector(".ch-name").value.trim() || "Seguro/tarifa";
+    const value = kind === "pct" ? parsePct(raw) : parseMoney(raw);
+    if (value == null) return { error: `Valor inválido em “${name}”.` };
+    charges.push({ name, kind, value });
+  }
+  return { charges };
 }
 
 const formMode = () => (editingId ? "edit" : document.querySelector('input[name="mode"]:checked').value);
@@ -669,24 +766,28 @@ function readCalc(system) {
   const principalCents = parseMoney($("#f-principal").value);
   const n = parseInt($("#f-total").value, 10);
   const freq = parseInt($("#f-freq").value, 10);
-  const feeRaw = $("#f-fee").value.trim();
-  const feeCents = feeRaw ? parseMoney(feeRaw) : 0;
+  const { charges, error } = readCharges();
+  if (error) return { error };
   if (!principalCents) return { error: isCons ? "Informe o valor da carta de crédito." : "Informe o valor financiado/emprestado." };
   if (!(n >= 1 && n <= 600)) return { error: "Informe a quantidade de parcelas (1 a 600)." };
-  if (feeCents == null) return { error: "Valor de seguros/tarifas inválido." };
   if (isCons) {
     const admPct = parsePct($("#f-adm").value);
     const frPct = parsePct($("#f-fr").value) ?? 0;
     if (admPct == null) return { error: "Informe a taxa de administração do consórcio." };
-    const calc = { system: "CONSORCIO", principalCents, admPct, frPct, feeCents };
-    return { calc, rows: consortiumSchedule({ principalCents, n, admPct, frPct, feeCents }) };
+    const calc = { system: "CONSORCIO", principalCents, admPct, frPct, charges };
+    return { calc, rows: consortiumSchedule({ principalCents, n, admPct, frPct, charges }) };
   }
   const ratePct = parsePct($("#f-rate").value);
   if (ratePct == null) return { error: "Informe a taxa de juros (pode ser 0)." };
   const rateUnit = $("#f-rate-unit").value;
   system = system || $("#f-system").value;
-  const calc = { system, principalCents, ratePct, rateUnit, feeCents };
-  return { calc, rows: loanSchedule({ principalCents, n, rate: periodRate(ratePct, rateUnit, freq), system, feeCents }) };
+  const upRaw = $("#f-upfront").value.trim();
+  const upfrontCents = upRaw ? parseMoney(upRaw) : 0;
+  if (upfrontCents == null) return { error: "Valor dos custos da contratação inválido." };
+  const rows = loanSchedule({ principalCents: principalCents + upfrontCents, n, rate: periodRate(ratePct, rateUnit, freq), system, charges });
+  const cetMonthly = toMonthly(cetRate(principalCents, rows), freq);
+  const calc = { system, principalCents, upfrontCents, ratePct, rateUnit, charges, cetMonthly };
+  return { calc, rows };
 }
 
 function summarize(rows) {
@@ -699,10 +800,15 @@ function updatePreview() {
   const res = readCalc();
   if (res.error) { box.innerHTML = `<span class="muted">${res.error.replace("Informe", "Preencha")} Assim que os dados estiverem completos, as parcelas aparecem aqui.</span>`; return; }
   const s = summarize(res.rows);
+  const feeFirst = res.rows[0].fees, feeLast = res.rows[res.rows.length - 1].fees;
   const isCons = res.calc.system === "CONSORCIO";
   let html = `<div>${s.first === s.last ? `Parcela: <b>${money(s.first)}</b>` : `1ª parcela: <b>${money(s.first)}</b> → última: <b>${money(s.last)}</b>`}</div>
-    <div>Total a pagar: <b>${money(s.total)}</b>${isCons ? "" : ` · juros: <b>${money(s.interest)}</b>`}${s.fees ? ` · taxas/seguros: <b>${money(s.fees)}</b>` : ""}</div>`;
+    <div>Total a pagar: <b>${money(s.total)}</b>${isCons ? "" : ` · juros: <b>${money(s.interest)}</b>`}${s.fees ? ` · taxas/seguros: <b>${money(s.fees)}</b>` : ""}</div>
+    ${s.fees ? `<div class="muted">Seguros e tarifas por parcela: ${feeFirst === feeLast ? money(feeFirst) : `${money(feeFirst)} na 1ª → ${money(feeLast)} na última`}</div>` : ""}`;
   if (!isCons) {
+    const m = res.calc.cetMonthly;
+    html += `<div>CET (custo efetivo total): <b>${pct(+(m * 100).toFixed(2))} a.m. · ${pct(+(toYearly(m) * 100).toFixed(2))} a.a.</b>
+      <span class="muted">— taxa real, incluindo juros, seguros, tarifas e custos da contratação</span></div>`;
     const other = res.calc.system === "PRICE" ? "SAC" : "PRICE";
     const o = summarize(readCalc(other).rows);
     const diff = o.total - s.total;
@@ -773,16 +879,31 @@ function getInst(ref) {
 }
 
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-pay],[data-unpay],[data-open],[data-edit],[data-delete],[data-contemplate],[data-filter],[data-close]");
+  const t = e.target.closest("[data-pay],[data-unpay],[data-open],[data-edit],[data-delete],[data-contemplate],[data-filter],[data-close],[data-rmextra]");
   if (!t) return;
   const ds = t.dataset;
   if (ds.pay) {
     e.stopPropagation();
     const i = getInst(ds.pay);
-    if (i) { i.paid = todayYMD(); save(); }
+    if (!i) return;
+    const today = todayYMD();
+    if (i.due < today) {
+      const days = Math.round((Date.parse(today) - Date.parse(i.due)) / 86400000);
+      const estimate = i.cents + Math.round(i.cents * 0.02) + Math.round(i.cents * 0.01 * days / 30);
+      const answer = prompt(
+        `Esta parcela venceu há ${days} dia(s). Quanto você pagou, com multa e juros?\n` +
+        `Estimativa (multa de 2% + juros de 1% ao mês): ${money(estimate)}. Valor da parcela: ${money(i.cents)}.`,
+        centsToInput(estimate));
+      if (answer == null) return;
+      const paidCents = answer.trim() ? parseMoney(answer) : i.cents;
+      if (paidCents == null) return alert("Valor inválido.");
+      if (paidCents !== i.cents) i.paidCents = paidCents; else delete i.paidCents;
+    }
+    i.paid = today;
+    save();
   } else if (ds.unpay) {
     const i = getInst(ds.unpay);
-    if (i) { i.paid = null; save(); }
+    if (i) { i.paid = null; delete i.paidCents; delete i.early; save(); }
   } else if (ds.open) {
     e.preventDefault();
     openDebtId = ds.open;
@@ -801,6 +922,17 @@ document.addEventListener("click", (e) => {
   } else if (ds.contemplate) {
     const d = findDebt(ds.contemplate);
     if (d) { d.contemplated = !d.contemplated; save(); }
+  } else if (ds.rmextra) {
+    e.preventDefault();
+    const [id, n, k] = ds.rmextra.split(":");
+    const i = getInst(`${id}:${n}`);
+    const x = i?.extras?.[Number(k)];
+    if (x && confirm(`Remover a cobrança de ${money(x.cents)} (${x.desc}) da parcela ${n}?`)) {
+      i.cents -= x.cents;
+      i.extras.splice(Number(k), 1);
+      if (!i.extras.length) delete i.extras;
+      save();
+    }
   } else if (ds.filter) {
     filter = ds.filter;
     render();
@@ -842,6 +974,22 @@ document.addEventListener("submit", (e) => {
     save();
     return;
   }
+  if (e.target.id === "charge-form") {
+    e.preventDefault();
+    const desc = $("#ex-desc").value.trim() || "cobrança extra";
+    const cents = parseMoney($("#ex-value").value);
+    const n = parseInt($("#ex-n").value, 10);
+    const repeat = $("#ex-repeat").checked;
+    if (!cents) return alert("Informe o valor da cobrança. Ex.: 120,00");
+    const targets = d.installments.filter((i) => !i.paid && (repeat ? i.n >= n : i.n === n));
+    if (!targets.length) return alert("Escolha uma parcela em aberto.");
+    for (const i of targets) {
+      i.extras = [...(i.extras || []), { desc, cents }];
+      i.cents += cents;
+    }
+    save();
+    return;
+  }
   if (e.target.id === "anticipate-form") {
     e.preventDefault();
     const n = parseInt($("#ant-count").value, 10);
@@ -861,7 +1009,11 @@ document.addEventListener("submit", (e) => {
   if (!cents) return alert("Informe o novo valor da parcela. Ex.: 912,40");
   let changed = 0;
   for (const i of d.installments) {
-    if (!i.paid && i.n >= from) { i.cents = cents; delete i.amort; delete i.interest; delete i.fees; delete i.balance; changed++; }
+    if (!i.paid && i.n >= from) {
+      i.cents = cents + extrasSum(i);
+      for (const k of ["amort", "interest", "fees", "feeDetail", "balance"]) delete i[k];
+      changed++;
+    }
   }
   if (!changed) return alert("Nenhuma parcela em aberto a partir desse número.");
   save();

@@ -13,9 +13,15 @@ Sisteminha para acompanhar consórcios, empréstimos, financiamentos e parcelame
    - **Calcular automaticamente**
      - *Empréstimo / financiamento:* valor financiado, taxa de juros (ao mês ou ao ano) e sistema
        de amortização — **Price** (parcelas iguais) ou **SAC** (amortização constante, parcelas que
-       diminuem). Dá para somar seguros/tarifas fixos por parcela. Antes de salvar, aparece uma prévia
-       com 1ª e última parcela, total de juros e a comparação com o outro sistema.
+       diminuem). Antes de salvar, aparece uma prévia com 1ª e última parcela, total de juros,
+       **CET** (custo efetivo total) e a comparação com o outro sistema.
      - *Consórcio:* valor da carta de crédito, taxa de administração e fundo de reserva.
+     - *Cobranças a mais do banco:*
+       - **Seguros e tarifas por parcela**, quantos quiser, cada um com nome: valor fixo em R$
+         (ex.: seguro DFI, tarifa de administração) ou **% do saldo devedor** (ex.: seguro MIP,
+         seguro prestamista — diminui conforme a dívida cai).
+       - **Custos da contratação financiados junto** (IOF, tarifa de cadastro, seguro à vista):
+         entram no saldo e pagam juros; o CET mostra quanto isso encarece o contrato.
    - **Já sei o valor da parcela:** você digita o valor e pronto.
 3. O sistema gera todas as parcelas com as datas de vencimento e, quando calculado, mostra
    amortização, juros, taxas e saldo devedor de cada uma.
@@ -30,6 +36,9 @@ Sisteminha para acompanhar consórcios, empréstimos, financiamentos e parcelame
    ou o valor das parcelas; o sistema recalcula e mostra a economia de juros antes de confirmar;
    um valor igual ou maior que o saldo quita tudo), **antecipar parcelas** (consórcio e parcelas
    informadas manualmente: paga as últimas),
+   adicionar **cobranças avulsas** (ex.: tarifa anual, seguro novo) numa parcela ou em todas as
+   seguintes, registrar **multa e juros por atraso** (ao marcar como paga uma parcela vencida, o
+   sistema sugere o valor com multa de 2% + juros de 1% ao mês e você confirma o que pagou),
    **reajustar o valor das parcelas em aberto** (útil para consórcio e financiamento com correção),
    marcar o consórcio como **contemplado**, editar ou excluir.
 
