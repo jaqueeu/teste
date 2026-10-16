@@ -45,7 +45,7 @@
   tr:last-child td { border-bottom: 0; }
   .table-card { padding: 4px 6px; overflow-x: auto; }
   .badge { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
-  .b-paid { background: var(--ok-bg); color: var(--ok); }
+  .b-paid, .b-early { background: var(--ok-bg); color: var(--ok); }
   .b-late { background: var(--danger-bg); color: var(--danger); }
   .b-soon { background: var(--warn-bg); color: var(--warn); }
   .b-open, .b-type { background: var(--info-bg); color: var(--primary); }
@@ -62,7 +62,7 @@
   .bar { height: 8px; background: var(--border); border-radius: 99px; overflow: hidden; margin-top: 10px; }
   .bar > div { height: 100%; background: var(--ok); }
   .empty { color: var(--muted); text-align: center; padding: 24px; }
-  dialog { border: 1px solid var(--border); border-radius: 14px; padding: 0; background: var(--card); color: var(--text); width: min(720px, calc(100vw - 24px)); max-height: calc(100vh - 32px); }
+  dialog { border: 1px solid var(--border); border-radius: 14px; padding: 0; background: var(--card); color: var(--text); width: min(980px, calc(100vw - 24px)); max-height: calc(100vh - 32px); }
   dialog::backdrop { background: rgba(0,0,0,.45); }
   .dlg-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--card); z-index: 1; }
   .dlg-head h3 { margin: 0; font-size: 17px; }
@@ -70,6 +70,17 @@
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
   @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
   .full { grid-column: 1 / -1; }
+  [hidden] { display: none !important; }
+  .contents { display: contents; }
+  .seg { display: flex; flex-wrap: wrap; gap: 8px; }
+  .seg label { display: flex; align-items: center; gap: 6px; margin: 0; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; cursor: pointer; }
+  .seg input { width: auto; }
+  .pair { display: flex; gap: 6px; }
+  .pair select { width: auto; }
+  .preview { background: var(--info-bg); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+  .preview:empty { display: none; }
+  .preview b { font-variant-numeric: tabular-nums; }
+  .preview .muted { font-size: 13px; margin-top: 4px; }
   label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
   input, select, textarea { width: 100%; font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
   textarea { min-height: 60px; resize: vertical; }
@@ -120,14 +131,42 @@
       <div><label for="f-type">Tipo *</label>
         <select id="f-type"></select></div>
       <div><label for="f-inst">Banco / administradora</label><input id="f-inst" placeholder="Ex.: Caixa, Porto Seguro"></div>
-      <div><label for="f-value">Valor da parcela (R$) *</label><input id="f-value" required inputmode="decimal" placeholder="Ex.: 850,00"></div>
       <div><label for="f-freq">Periodicidade *</label><select id="f-freq"></select></div>
-      <div class="schedule"><label for="f-total">Quantidade de parcelas *</label><input id="f-total" type="number" min="1" max="600" required></div>
-      <div class="schedule"><label for="f-first">Vencimento da 1ª parcela *</label><input id="f-first" type="date" required></div>
-      <div class="schedule"><label for="f-paid">Parcelas já pagas</label><input id="f-paid" type="number" min="0" value="0">
+      <div><label for="f-total">Quantidade de parcelas *</label><input id="f-total" type="number" min="1" max="600" required></div>
+      <div><label for="f-first">Vencimento da 1ª parcela *</label><input id="f-first" type="date" required></div>
+      <div><label for="f-paid">Parcelas já pagas</label><input id="f-paid" type="number" min="0" value="0">
         <div class="help">As primeiras parcelas serão marcadas como pagas.</div></div>
-      <div><label for="f-total-value">Valor total do contrato / carta (R$)</label><input id="f-total-value" inputmode="decimal" placeholder="Opcional">
-        <div class="help">Valor do bem, crédito ou empréstimo contratado.</div></div>
+
+      <div class="full new-only"><label>Como definir o valor das parcelas?</label>
+        <div class="seg">
+          <label><input type="radio" name="mode" value="calc" checked> Calcular automaticamente</label>
+          <label><input type="radio" name="mode" value="manual"> Já sei o valor da parcela</label>
+        </div></div>
+
+      <div class="contents new-only" id="calc-box">
+        <div><label for="f-principal" id="l-principal">Valor financiado / emprestado (R$) *</label><input id="f-principal" inputmode="decimal" placeholder="Ex.: 250.000,00">
+          <div class="help loan-only">Valor que o banco liberou (sem a entrada).</div></div>
+        <div class="loan-only"><label for="f-system">Sistema de amortização *</label>
+          <select id="f-system">
+            <option value="PRICE">Price — parcelas iguais</option>
+            <option value="SAC">SAC — parcelas diminuem</option>
+          </select></div>
+        <div class="loan-only"><label for="f-rate">Taxa de juros (%) *</label>
+          <div class="pair"><input id="f-rate" inputmode="decimal" placeholder="Ex.: 1,49">
+            <select id="f-rate-unit"><option value="am">ao mês</option><option value="aa">ao ano</option></select></div></div>
+        <div class="cons-only"><label for="f-adm">Taxa de administração total (%) *</label><input id="f-adm" inputmode="decimal" placeholder="Ex.: 16">
+          <div class="help">Percentual sobre a carta, no prazo todo.</div></div>
+        <div class="cons-only"><label for="f-fr">Fundo de reserva (%)</label><input id="f-fr" inputmode="decimal" placeholder="Ex.: 2"></div>
+        <div><label for="f-fee">Seguros e tarifas por parcela (R$)</label><input id="f-fee" inputmode="decimal" placeholder="Opcional">
+          <div class="help">Valor fixo somado a cada parcela (ex.: seguro MIP/DFI, tarifa).</div></div>
+        <div class="full preview" id="calc-preview"></div>
+      </div>
+
+      <div class="contents" id="manual-box">
+        <div><label for="f-value">Valor da parcela (R$) *</label><input id="f-value" inputmode="decimal" placeholder="Ex.: 850,00"></div>
+        <div><label for="f-total-value">Valor total do contrato / carta (R$)</label><input id="f-total-value" inputmode="decimal" placeholder="Opcional">
+          <div class="help">Valor do bem, crédito ou empréstimo contratado.</div></div>
+      </div>
       <div class="full" id="edit-hint" hidden><div class="help">Para mudar o valor das parcelas, use “Reajustar parcelas em aberto” na tela do compromisso. Quantidade, periodicidade e datas não podem ser alteradas depois do cadastro.</div></div>
       <div class="full"><label for="f-notes">Observações</label><textarea id="f-notes" placeholder="Ex.: número do contrato, grupo/cota do consórcio, dia de débito automático"></textarea></div>
       <div class="full actions" style="justify-content:flex-end"><button type="button" data-close>Cancelar</button><button class="primary" type="submit">Salvar</button></div>
@@ -170,6 +209,7 @@ function parseMoney(str) {
   let s = String(str || "").replace(/[R$\s]/g, "");
   if (!s) return null;
   if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, ""); // "300.000" = trezentos mil
   const n = Number(s);
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null;
 }
@@ -219,22 +259,130 @@ function save() {
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const findDebt = (id) => state.debts.find((d) => d.id === id);
 
-function buildInstallments(firstDue, count, freqMonths, cents, alreadyPaid) {
-  const list = [];
-  for (let i = 0; i < count; i++) {
+// rows: [{ cents, amort?, interest?, fees?, balance? }] — uma por parcela
+function buildInstallments(firstDue, freqMonths, rows, alreadyPaid) {
+  return rows.map((row, i) => {
     const due = addMonths(firstDue, i * freqMonths);
-    list.push({ n: i + 1, due, cents, paid: i < alreadyPaid ? due : null });
+    return { n: i + 1, due, ...row, paid: i < alreadyPaid ? due : null };
+  });
+}
+
+// ---------- Cálculo das parcelas ----------
+const SYSTEMS = { PRICE: "Price (parcelas iguais)", SAC: "SAC (amortização constante)", CONSORCIO: "Consórcio" };
+
+// Converte a taxa informada (ao mês ou ao ano) para a taxa do período da parcela (juros compostos)
+function periodRate(ratePct, unit, freqMonths) {
+  const r = ratePct / 100;
+  const monthly = unit === "aa" ? Math.pow(1 + r, 1 / 12) - 1 : r;
+  return Math.pow(1 + monthly, freqMonths) - 1;
+}
+
+// Tabela Price: prestação fixa; juros sobre o saldo devedor, o resto amortiza.
+// SAC: amortização fixa; juros sobre o saldo devedor, parcelas decrescentes.
+function loanSchedule({ principalCents: P, n, rate: i, system, feeCents = 0 }) {
+  const rows = [];
+  let balance = P;
+  const pmt = i > 0 ? (P * i) / (1 - Math.pow(1 + i, -n)) : P / n;
+  for (let k = 0; k < n; k++) {
+    const interest = Math.round(balance * i);
+    let amort;
+    if (k === n - 1) amort = balance; // última parcela zera o saldo (ajuste de centavos)
+    else if (system === "SAC") amort = Math.round((P * (k + 1)) / n) - Math.round((P * k) / n);
+    else amort = Math.round(pmt) - interest;
+    balance -= amort;
+    rows.push({ cents: amort + interest + feeCents, amort, interest, fees: feeCents, balance });
   }
-  return list;
+  return rows;
+}
+
+// Consórcio: (carta de crédito + taxa de administração + fundo de reserva) ÷ nº de parcelas
+function consortiumSchedule({ principalCents: P, n, admPct, frPct, feeCents = 0 }) {
+  const rows = [];
+  const extras = P * ((admPct + frPct) / 100);
+  let balance = P;
+  for (let k = 0; k < n; k++) {
+    const amort = Math.round((P * (k + 1)) / n) - Math.round((P * k) / n);
+    const fees = Math.round((extras * (k + 1)) / n) - Math.round((extras * k) / n) + feeCents;
+    balance -= amort;
+    rows.push({ cents: amort + fees, amort, interest: 0, fees, balance });
+  }
+  return rows;
+}
+
+const sumOf = (rows, key) => rows.reduce((s, r) => s + (r[key] || 0), 0);
+
+// ---------- Amortização extraordinária ----------
+// Saldo devedor antes da próxima parcela em aberto (null se não houver detalhamento)
+function currentBalance(d) {
+  const next = d.installments.find((i) => !i.paid);
+  if (!next) return 0;
+  if (next.amort == null || next.balance == null) return null;
+  return next.balance + next.amort;
+}
+
+// Calcula (sem alterar nada) como ficam as parcelas após amortizar `extraCents`.
+// mode: "prazo" (mantém a parcela e reduz o número de parcelas) ou "parcela" (mantém o prazo e reduz o valor)
+function simulateAmortization(d, extraCents, mode) {
+  const c = d.calc;
+  const startIdx = d.installments.findIndex((i) => !i.paid);
+  if (startIdx < 0) return { error: "Este compromisso já está quitado." };
+  const open = d.installments.slice(startIdx);
+  if (open.some((i) => i.paid)) return { error: "Marque as parcelas pagas em ordem antes de amortizar." };
+  const B = currentBalance(d);
+  if (B == null) return { error: "Este compromisso não tem o detalhamento de saldo devedor." };
+  const rate = periodRate(c.ratePct, c.rateUnit, d.freq);
+  const fee = c.feeCents || 0;
+  const oldTotal = sumOf(open, "cents");
+
+  if (extraCents >= B) {
+    return { startIdx, payoff: true, extra: B, rows: [], saving: oldTotal - B, oldCount: open.length };
+  }
+  const nb = B - extraCents;
+  let rows;
+  if (mode === "parcela") {
+    rows = loanSchedule({ principalCents: nb, n: open.length, rate, system: c.system, feeCents: fee });
+  } else {
+    rows = [];
+    let bal = nb;
+    const pmt = open[0].cents - fee; // prestação sem seguros (Price)
+    const amortFixed = open[0].amort; // amortização constante (SAC)
+    while (bal > 0 && rows.length < 600) {
+      const interest = Math.round(bal * rate);
+      let amort = c.system === "SAC" ? amortFixed : pmt - interest;
+      if (amort >= bal || amort <= 0) amort = bal;
+      bal -= amort;
+      rows.push({ cents: amort + interest + fee, amort, interest, fees: fee, balance: bal });
+    }
+  }
+  const newTotal = sumOf(rows, "cents");
+  return { startIdx, rows, extra: extraCents, saving: oldTotal - newTotal - extraCents, oldCount: open.length, oldCents: open[0].cents };
+}
+
+function applyAmortization(d, sim, mode) {
+  const today = todayYMD();
+  const kept = d.installments.slice(0, sim.startIdx);
+  if (sim.payoff) {
+    const first = d.installments[sim.startIdx];
+    kept.push({ n: first.n, due: today, cents: sim.extra, amort: sim.extra, interest: 0, fees: 0, balance: 0, paid: today, early: true });
+  } else {
+    sim.rows.forEach((row, k) => {
+      const idx = sim.startIdx + k;
+      kept.push({ n: idx + 1, due: addMonths(d.installments[0].due, idx * d.freq), ...row, paid: null });
+    });
+  }
+  d.installments = kept;
+  d.prepayments = d.prepayments || [];
+  if (!sim.payoff) d.prepayments.push({ date: today, cents: sim.extra, mode, saving: sim.saving });
+  else d.prepayments.push({ date: today, cents: 0, mode: "quitacao", saving: sim.saving, payoffCents: sim.extra });
 }
 
 function statusOf(inst, today) {
-  if (inst.paid) return "paid";
+  if (inst.paid) return inst.early ? "early" : "paid";
   if (inst.due < today) return "late";
   if (inst.due <= addDays(today, 7)) return "soon";
   return "open";
 }
-const STATUS_LABEL = { paid: "Paga", late: "Em atraso", soon: "Vence em breve", open: "Em aberto" };
+const STATUS_LABEL = { early: "Antecipada", paid: "Paga", late: "Em atraso", soon: "Vence em breve", open: "Em aberto" };
 const badge = (st) => `<span class="badge b-${st}">${STATUS_LABEL[st]}</span>`;
 
 function debtStats(debt) {
@@ -244,7 +392,7 @@ function debtStats(debt) {
   return {
     paidCount: paid.length,
     total: debt.installments.length,
-    paidCents: paid.reduce((s, i) => s + i.cents, 0),
+    paidCents: paid.reduce((s, i) => s + i.cents, 0) + (debt.prepayments || []).reduce((s, p) => s + p.cents, 0),
     remainingCents: open.reduce((s, i) => s + i.cents, 0),
     next,
     lastDue: open.length ? open[open.length - 1].due : null,
@@ -340,7 +488,7 @@ function renderDebts(today) {
     return `<div class="card debt" data-open="${d.id}" tabindex="0">
       <div class="top"><div><div class="name">${esc(d.name)}</div><div class="inst">${esc(d.institution || "")}</div></div>
         <span class="badge b-type">${TYPES[d.type]}</span></div>
-      <div class="row"><span>Parcela</span><b>${money(s.next ? s.next.cents : d.installments[d.installments.length - 1].cents)} · ${FREQS[d.freq].toLowerCase()}</b></div>
+      <div class="row"><span>Parcela</span><b>${s.next ? `${money(s.next.cents)} · ${FREQS[d.freq].toLowerCase()}` : "—"}</b></div>
       <div class="row"><span>Próximo vencimento</span><span>${nextLine}</span></div>
       <div class="row"><span>Falta pagar</span><b>${money(s.remainingCents)}</b></div>
       ${d.type === "CONSORCIO" ? `<div class="row"><span>Contemplado</span><span>${d.contemplated ? "Sim ✓" : "Ainda não"}</span></div>` : ""}
@@ -350,11 +498,63 @@ function renderDebts(today) {
   }).join("");
 }
 
+const pct = (v) => v.toLocaleString("pt-BR", { maximumFractionDigits: 4 }) + "%";
+
+// Informações extras de compromissos com parcelas calculadas
+function calcInfo(d, s) {
+  const c = d.calc;
+  if (!c) return "";
+  const balance = currentBalance(d);
+  const interestTotal = sumOf(d.installments, "interest");
+  const feesTotal = sumOf(d.installments, "fees");
+  let out = `<div><span>Sistema</span><b>${SYSTEMS[c.system]}</b></div>`;
+  if (c.system === "CONSORCIO") {
+    out += `<div><span>Taxa de adm. / fundo de reserva</span><b>${pct(c.admPct)} / ${pct(c.frPct)}</b></div>`;
+  } else {
+    const m = c.rateUnit === "aa" ? (Math.pow(1 + c.ratePct / 100, 1 / 12) - 1) * 100 : c.ratePct;
+    const a = (Math.pow(1 + m / 100, 12) - 1) * 100;
+    out += `<div><span>Juros</span><b>${pct(+m.toFixed(4))} a.m. · ${pct(+a.toFixed(2))} a.a.</b></div>`;
+    out += `<div><span>Total de juros (previsto)</span><b>${money(interestTotal)}</b></div>`;
+  }
+  if (feesTotal) out += `<div><span>Total de taxas/seguros</span><b>${money(feesTotal)}</b></div>`;
+  if (balance != null && !s.done) out += `<div><span>${c.system === "CONSORCIO" ? "Falta do fundo comum" : "Saldo devedor atual"}</span><b>${money(balance)}</b></div>`;
+  return out;
+}
+
+const canAmortize = (d) => d.calc && d.calc.system !== "CONSORCIO" && currentBalance(d) != null;
+const MODE_LABEL = { prazo: "reduzindo o prazo", parcela: "reduzindo a parcela", quitacao: "quitação antecipada" };
+
+function extraForms(d, s) {
+  if (s.done) return "";
+  if (canAmortize(d)) {
+    return `<form class="inline-form" id="amortize-form">
+      <div><label for="am-value">Amortização extra (R$)</label><input id="am-value" inputmode="decimal" placeholder="Ex.: 10.000,00"></div>
+      <div><label for="am-mode">O que reduzir?</label>
+        <select id="am-mode"><option value="prazo">O prazo (menos parcelas)</option><option value="parcela">O valor das parcelas</option></select></div>
+      <button type="submit" class="primary">Simular e amortizar</button>
+      <div class="help" style="flex-basis:100%">Saldo devedor hoje: <b>${money(currentBalance(d))}</b>. Informe um valor igual ou maior para quitar tudo.</div>
+    </form>`;
+  }
+  const open = d.installments.filter((i) => !i.paid).length;
+  return `<form class="inline-form" id="anticipate-form">
+    <div><label for="ant-count">Antecipar parcelas (pagar as últimas)</label><input id="ant-count" type="number" min="1" max="${open}" value="1"></div>
+    <button type="submit">Antecipar</button>
+    <div class="help" style="flex-basis:100%">Marca como pagas hoje as últimas parcelas, encurtando o prazo${d.type === "CONSORCIO" ? " — como num lance ou antecipação do consórcio" : ""}.</div>
+  </form>`;
+}
+
+function prepaymentHistory(d) {
+  if (!d.prepayments?.length) return "";
+  return `<div class="notes"><b>Amortizações feitas</b><br>${d.prepayments.map((p) =>
+    `${fmtDate(p.date)} — ${p.mode === "quitacao" ? `quitação de ${money(p.payoffCents)}` : `${money(p.cents)} ${MODE_LABEL[p.mode]}`}${p.saving > 0 ? ` · economia de ${money(p.saving)}` : ""}`).join("<br>")}</div>`;
+}
+
 function renderDetail(id) {
   const d = findDebt(id);
   if (!d) { $("#dlg-detail").close(); return; }
   const today = todayYMD();
   const s = debtStats(d);
+  const hasBreakdown = d.installments.some((i) => i.amort != null);
   $("#detail-title").textContent = d.name;
   $("#detail-body").innerHTML = `
     <div class="info-grid">
@@ -365,8 +565,9 @@ function renderDetail(id) {
       <div><span>Total já pago</span><b>${money(s.paidCents)}</b></div>
       <div><span>Falta pagar</span><b>${money(s.remainingCents)}</b></div>
       <div><span>Previsão de quitação</span><b>${s.done ? "Quitado ✓" : fmtDate(s.lastDue)}</b></div>
-      ${d.totalValueCents != null ? `<div><span>Valor do contrato</span><b>${money(d.totalValueCents)}</b></div>` : ""}
+      ${d.totalValueCents != null ? `<div><span>${d.type === "CONSORCIO" ? "Carta de crédito" : "Valor do contrato"}</span><b>${money(d.totalValueCents)}</b></div>` : ""}
       ${d.type === "CONSORCIO" ? `<div><span>Contemplado</span><b>${d.contemplated ? "Sim ✓" : "Ainda não"}</b></div>` : ""}
+      ${calcInfo(d, s)}
     </div>
     ${d.notes ? `<div class="notes">${esc(d.notes)}</div>` : ""}
     <div class="actions">
@@ -374,7 +575,9 @@ function renderDetail(id) {
       ${d.type === "CONSORCIO" ? `<button data-contemplate="${d.id}">${d.contemplated ? "Desmarcar contemplação" : "Marcar como contemplado"}</button>` : ""}
       <button class="danger" data-delete="${d.id}">Excluir</button>
     </div>
-    ${s.done ? "" : `
+    ${extraForms(d, s)}
+    ${prepaymentHistory(d)}
+    ${s.done || canAmortize(d) ? "" : `
     <form class="inline-form" id="adjust-form">
       <div><label for="adj-value">Reajustar parcelas em aberto para (R$)</label><input id="adj-value" inputmode="decimal" placeholder="${centsToInput(s.next.cents)}"></div>
       <div><label for="adj-from">A partir da parcela</label><input id="adj-from" type="number" min="${s.next.n}" max="${s.total}" value="${s.next.n}"></div>
@@ -382,11 +585,16 @@ function renderDetail(id) {
     </form>`}
     <div class="table-card" style="padding:0">
     <table>
-      <thead><tr><th>Nº</th><th>Vencimento</th><th class="num">Valor</th><th>Situação</th><th>Pago em</th><th></th></tr></thead>
+      <thead><tr><th>Nº</th><th>Vencimento</th><th class="num">Valor</th>
+        ${hasBreakdown ? `<th class="num">Amortização</th><th class="num">Juros</th><th class="num">Taxas/seguro</th><th class="num">Saldo devedor</th>` : ""}
+        <th>Situação</th><th>Pago em</th><th></th></tr></thead>
       <tbody>${d.installments.map((i) => {
         const st = statusOf(i, today);
+        const part = (v) => `<td class="num">${v == null ? "—" : money(v)}</td>`;
         return `<tr>
-          <td>${i.n}</td><td>${fmtDate(i.due)}</td><td class="num">${money(i.cents)}</td><td>${badge(st)}</td>
+          <td>${i.n}</td><td>${fmtDate(i.due)}</td><td class="num"><b>${money(i.cents)}</b></td>
+          ${hasBreakdown ? part(i.amort) + part(i.interest) + part(i.fees) + part(i.balance) : ""}
+          <td>${badge(st)}</td>
           <td>${i.paid ? fmtDate(i.paid) : ""}</td>
           <td class="num">${i.paid
             ? `<button class="small" data-unpay="${d.id}:${i.n}">Desfazer</button>`
@@ -418,47 +626,139 @@ function openForm(id) {
   $("#f-paid").value = d ? debtStats(d).paidCount : 0;
   $("#f-total-value").value = centsToInput(d?.totalValueCents);
   $("#f-notes").value = d?.notes || "";
-  // Na edição, o cronograma não muda
-  for (const el of ["#f-value", "#f-freq", "#f-total", "#f-first", "#f-paid"]) {
-    $(el).disabled = !!d;
-    $(el).required = !d;
+  if (!d) {
+    for (const el of ["#f-principal", "#f-rate", "#f-adm", "#f-fr", "#f-fee"]) $(el).value = "";
+    $("#f-system").value = "PRICE";
+    $("#f-rate-unit").value = "am";
+    document.querySelector('input[name="mode"][value="calc"]').checked = true;
   }
+  // Na edição, o cronograma não muda
+  for (const el of ["#f-value", "#f-freq", "#f-total", "#f-first", "#f-paid"]) $(el).disabled = !!d;
   $("#edit-hint").hidden = !d;
+  updateFormVisibility();
   $("#dlg-form").showModal();
   $("#f-name").focus();
 }
+
+const formMode = () => (editingId ? "edit" : document.querySelector('input[name="mode"]:checked').value);
+
+function updateFormVisibility() {
+  const mode = formMode();
+  const isCons = $("#f-type").value === "CONSORCIO";
+  for (const el of document.querySelectorAll("#debt-form .new-only")) el.hidden = mode === "edit";
+  $("#calc-box").hidden = mode !== "calc";
+  $("#f-value").parentElement.hidden = mode === "calc";
+  $("#f-total-value").parentElement.hidden = mode === "calc";
+  for (const el of document.querySelectorAll("#calc-box .loan-only")) el.hidden = isCons;
+  for (const el of document.querySelectorAll("#calc-box .cons-only")) el.hidden = !isCons;
+  $("#l-principal").textContent = isCons ? "Valor da carta de crédito (R$) *" : "Valor financiado / emprestado (R$) *";
+  updatePreview();
+}
+
+const parsePct = (str) => {
+  let s = String(str || "").replace(/[%\s]/g, "");
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  if (!s) return null;
+  const n = Number(s);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+};
+
+// Lê os campos de cálculo; retorna { error } ou { rows, calc }
+function readCalc(system) {
+  const isCons = $("#f-type").value === "CONSORCIO";
+  const principalCents = parseMoney($("#f-principal").value);
+  const n = parseInt($("#f-total").value, 10);
+  const freq = parseInt($("#f-freq").value, 10);
+  const feeRaw = $("#f-fee").value.trim();
+  const feeCents = feeRaw ? parseMoney(feeRaw) : 0;
+  if (!principalCents) return { error: isCons ? "Informe o valor da carta de crédito." : "Informe o valor financiado/emprestado." };
+  if (!(n >= 1 && n <= 600)) return { error: "Informe a quantidade de parcelas (1 a 600)." };
+  if (feeCents == null) return { error: "Valor de seguros/tarifas inválido." };
+  if (isCons) {
+    const admPct = parsePct($("#f-adm").value);
+    const frPct = parsePct($("#f-fr").value) ?? 0;
+    if (admPct == null) return { error: "Informe a taxa de administração do consórcio." };
+    const calc = { system: "CONSORCIO", principalCents, admPct, frPct, feeCents };
+    return { calc, rows: consortiumSchedule({ principalCents, n, admPct, frPct, feeCents }) };
+  }
+  const ratePct = parsePct($("#f-rate").value);
+  if (ratePct == null) return { error: "Informe a taxa de juros (pode ser 0)." };
+  const rateUnit = $("#f-rate-unit").value;
+  system = system || $("#f-system").value;
+  const calc = { system, principalCents, ratePct, rateUnit, feeCents };
+  return { calc, rows: loanSchedule({ principalCents, n, rate: periodRate(ratePct, rateUnit, freq), system, feeCents }) };
+}
+
+function summarize(rows) {
+  return { first: rows[0].cents, last: rows[rows.length - 1].cents, total: sumOf(rows, "cents"), interest: sumOf(rows, "interest"), fees: sumOf(rows, "fees") };
+}
+
+function updatePreview() {
+  const box = $("#calc-preview");
+  if (formMode() !== "calc") { box.innerHTML = ""; return; }
+  const res = readCalc();
+  if (res.error) { box.innerHTML = `<span class="muted">${res.error.replace("Informe", "Preencha")} Assim que os dados estiverem completos, as parcelas aparecem aqui.</span>`; return; }
+  const s = summarize(res.rows);
+  const isCons = res.calc.system === "CONSORCIO";
+  let html = `<div>${s.first === s.last ? `Parcela: <b>${money(s.first)}</b>` : `1ª parcela: <b>${money(s.first)}</b> → última: <b>${money(s.last)}</b>`}</div>
+    <div>Total a pagar: <b>${money(s.total)}</b>${isCons ? "" : ` · juros: <b>${money(s.interest)}</b>`}${s.fees ? ` · taxas/seguros: <b>${money(s.fees)}</b>` : ""}</div>`;
+  if (!isCons) {
+    const other = res.calc.system === "PRICE" ? "SAC" : "PRICE";
+    const o = summarize(readCalc(other).rows);
+    const diff = o.total - s.total;
+    html += `<div class="muted">Comparação no ${other === "SAC" ? "SAC" : "Price"}: ${o.first === o.last ? `parcela ${money(o.first)}` : `1ª ${money(o.first)} → última ${money(o.last)}`},
+      total ${money(o.total)} (${diff > 0 ? `${money(diff)} a mais` : `${money(-diff)} a menos`}).</div>`;
+  }
+  box.innerHTML = html;
+}
+
+$("#debt-form").addEventListener("input", updatePreview);
+$("#debt-form").addEventListener("change", (e) => {
+  if (e.target.matches('#f-type, input[name="mode"]')) updateFormVisibility();
+});
 
 $("#debt-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const name = $("#f-name").value.trim();
   if (!name) return alert("Informe o nome.");
-  const totalValueRaw = $("#f-total-value").value.trim();
-  const totalValueCents = totalValueRaw ? parseMoney(totalValueRaw) : null;
-  if (totalValueRaw && totalValueCents == null) return alert("Valor total inválido.");
+  const mode = formMode();
   const common = {
     name,
     type: $("#f-type").value,
     institution: $("#f-inst").value.trim(),
-    totalValueCents,
     notes: $("#f-notes").value.trim(),
   };
+  if (mode !== "calc") {
+    const totalValueRaw = $("#f-total-value").value.trim();
+    common.totalValueCents = totalValueRaw ? parseMoney(totalValueRaw) : null;
+    if (totalValueRaw && common.totalValueCents == null) return alert("Valor total inválido.");
+  }
 
-  if (editingId) {
+  if (mode === "edit") {
     Object.assign(findDebt(editingId), common);
   } else {
-    const cents = parseMoney($("#f-value").value);
     const total = parseInt($("#f-total").value, 10);
     const paid = parseInt($("#f-paid").value || "0", 10);
     const freq = parseInt($("#f-freq").value, 10);
     const first = $("#f-first").value;
-    if (!cents) return alert("Informe um valor de parcela válido. Ex.: 850,00");
     if (!(total >= 1 && total <= 600)) return alert("A quantidade de parcelas deve ser entre 1 e 600.");
     if (!(paid >= 0 && paid <= total)) return alert("Parcelas já pagas não pode ser maior que o total.");
     if (!first) return alert("Informe a data da 1ª parcela.");
+    let rows, calc = null;
+    if (mode === "calc") {
+      const res = readCalc();
+      if (res.error) return alert(res.error);
+      ({ rows, calc } = res);
+      common.totalValueCents = calc.principalCents;
+    } else {
+      const cents = parseMoney($("#f-value").value);
+      if (!cents) return alert("Informe um valor de parcela válido. Ex.: 850,00");
+      rows = Array.from({ length: total }, () => ({ cents }));
+    }
     state.debts.push({
-      id: newId(), ...common, freq, contemplated: false,
+      id: newId(), ...common, freq, calc, contemplated: false,
       createdAt: new Date().toISOString(),
-      installments: buildInstallments(first, total, freq, cents, paid),
+      installments: buildInstallments(first, freq, rows, paid),
     });
   }
   $("#dlg-form").close();
@@ -514,15 +814,54 @@ document.addEventListener("keydown", (e) => {
 });
 
 document.addEventListener("submit", (e) => {
+  const d = findDebt(openDebtId);
+  if (!d) return;
+  if (e.target.id === "amortize-form") {
+    e.preventDefault();
+    const extra = parseMoney($("#am-value").value);
+    const mode = $("#am-mode").value;
+    if (!extra) return alert("Informe o valor da amortização. Ex.: 10.000,00");
+    const sim = simulateAmortization(d, extra, mode);
+    if (sim.error) return alert(sim.error);
+    let msg;
+    if (sim.payoff) {
+      msg = `Quitação total: pagar ${money(sim.extra)} hoje.\n` +
+        `As ${sim.oldCount} parcelas restantes deixam de existir.\nEconomia estimada: ${money(sim.saving)}.`;
+    } else if (mode === "prazo") {
+      msg = `Amortizar ${money(extra)} reduzindo o prazo:\n` +
+        `• Parcelas restantes: ${sim.oldCount} → ${sim.rows.length} (${sim.oldCount - sim.rows.length} a menos)\n` +
+        `• Nova quitação: ${fmtDate(addMonths(d.installments[0].due, (sim.startIdx + sim.rows.length - 1) * d.freq))}\n` +
+        `• Próxima parcela: ${money(sim.rows[0].cents)}\n• Economia estimada: ${money(sim.saving)}`;
+    } else {
+      msg = `Amortizar ${money(extra)} reduzindo a parcela:\n` +
+        `• Próxima parcela: ${money(sim.oldCents)} → ${money(sim.rows[0].cents)}\n` +
+        `• Parcelas restantes: ${sim.oldCount} (prazo mantido)\n• Economia estimada: ${money(sim.saving)}`;
+    }
+    if (!confirm(msg + "\n\nConfirmar?")) return;
+    applyAmortization(d, sim, mode);
+    save();
+    return;
+  }
+  if (e.target.id === "anticipate-form") {
+    e.preventDefault();
+    const n = parseInt($("#ant-count").value, 10);
+    const open = d.installments.filter((i) => !i.paid);
+    if (!(n >= 1 && n <= open.length)) return alert(`Informe de 1 a ${open.length} parcelas.`);
+    const chosen = open.slice(-n);
+    if (!confirm(`Antecipar ${n} parcela(s) (nº ${chosen[0].n} a ${chosen[n - 1].n}), total ${money(sumOf(chosen, "cents"))}?`)) return;
+    const today = todayYMD();
+    for (const i of chosen) { i.paid = today; i.early = true; }
+    save();
+    return;
+  }
   if (e.target.id !== "adjust-form") return;
   e.preventDefault();
-  const d = findDebt(openDebtId);
   const cents = parseMoney($("#adj-value").value);
   const from = parseInt($("#adj-from").value, 10);
-  if (!d || !cents) return alert("Informe o novo valor da parcela. Ex.: 912,40");
+  if (!cents) return alert("Informe o novo valor da parcela. Ex.: 912,40");
   let changed = 0;
   for (const i of d.installments) {
-    if (!i.paid && i.n >= from) { i.cents = cents; changed++; }
+    if (!i.paid && i.n >= from) { i.cents = cents; delete i.amort; delete i.interest; delete i.fees; delete i.balance; changed++; }
   }
   if (!changed) return alert("Nenhuma parcela em aberto a partir desse número.");
   save();
