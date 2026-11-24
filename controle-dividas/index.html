@@ -1360,6 +1360,7 @@ const localBackend = {
 let backend = null;
 let migrateFrom = null;   // cofre pessoal antigo, levado para o cofre da família ao abrir
 let downloadsApi = null;
+let inboxDb = null;       // caixa de entrada: compromissos deixados pelo Claude para importar
 let isOwner = true;
 let readOnly = false;
 let dataKey = null;       // chave dos dados (CryptoKey, não exportável), só na memória
@@ -1419,6 +1420,7 @@ async function initVault() {
     isOwner = (await user.isOwner()) ?? false;
     readOnly = (await user.can("data.write")) === false;
     backend = cloudBackend(db, "vault/meta", (rev, i) => `vaultparts/${rev}-${i}`, "no armazenamento desta página");
+    inboxDb = db;
     const personal = cloudBackend(db, `data/users/${uid}/vault`, (rev, i) => `data/users/${uid}/vault-${rev}-${i}`, "");
     try {
       if (!(await backend.read()) && (await personal.read())) migrateFrom = personal;
@@ -1577,12 +1579,45 @@ function enterApp() {
   lastActivity = Date.now();
   setStatus(readOnly ? "readonly" : dirty ? "pending" : "saved");
   render();
+  processInbox();
   unwatch();
   unwatch = backend.watch((meta) => {
     if (!dataKey || !lastVault || meta.rev === lastVault.rev) return;
     if (Array.isArray(meta.slots)) slots = meta.slots; // chaves cadastradas pela outra pessoa
     $("#remote-banner").hidden = false;
   });
+}
+
+// Caixa de entrada: o Claude deixa compromissos em "inbox/<id>". Ao abrir o cofre, o app os junta
+// aos dados (mesmo id substitui, novo é adicionado), salva tudo criptografado e apaga a caixa.
+async function processInbox() {
+  if (!inboxDb || readOnly || !dataKey) return;
+  let snap;
+  try { snap = await inboxDb.collection("inbox").get(); } catch (e) { return; }
+  const docs = snap.docs.filter((d) => d.exists && d.data()?.app === "controle-dividas" && Array.isArray(d.data().debts));
+  if (!docs.length) return;
+  const names = [];
+  for (const doc of docs) {
+    for (const debt of doc.data().debts) {
+      if (!debt || typeof debt.id !== "string" || !Array.isArray(debt.installments) || !debt.installments.length || !TYPES[debt.type]) continue;
+      const copy = JSON.parse(JSON.stringify(debt));
+      const at = state.debts.findIndex((d) => d.id === copy.id);
+      if (at >= 0) state.debts[at] = copy; else state.debts.push(copy);
+      names.push(copy.name);
+    }
+  }
+  if (!names.length) return;
+  render();
+  dirty = true;
+  try {
+    await flush();
+    await persistNow(true);
+  } catch (e) {
+    notify("Chegaram compromissos novos, mas não foi possível salvá-los agora. Eles continuam guardados e entram na próxima vez que você abrir o app.");
+    return;
+  }
+  for (const doc of docs) await inboxDb.doc(`inbox/${doc.id}`).delete().catch(() => {});
+  notify(`Importados ${names.length} compromisso(s) enviados pelo Claude:\n• ${names.join("\n• ")}\n\nEles já estão salvos e criptografados no cofre da família.`);
 }
 
 async function lockNow(message) {
