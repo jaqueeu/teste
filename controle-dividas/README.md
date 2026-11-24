@@ -45,15 +45,21 @@ Sisteminha para acompanhar consórcios, empréstimos, financiamentos e parcelame
 **Dica:** financiamento com parcela mensal + parcela anual (intermediária/balão)? Cadastre dois
 compromissos: um mensal e outro anual.
 
-## Segurança e onde ficam os dados
+## Segurança, família e onde ficam os dados
 
-- O app pede uma **senha** (mínimo de 10 caracteres). Ela nunca é salva nem enviada.
-- Os dados são **criptografados no próprio aparelho** (AES-256-GCM, chave derivada da senha com
-  PBKDF2-SHA256 e 600.000 iterações) antes de serem guardados.
-- **Versão online (claude.ai):** o conteúdo criptografado fica na área privada da sua conta, que
-  nem outras pessoas com acesso à página conseguem ler; sem a senha, ele é ilegível.
-- **Arquivo aberto no computador:** o conteúdo criptografado fica no navegador. Dados de versões
+- **Cofre da família:** todos com acesso à página veem os mesmos dados. Na versão online, quem
+  criou a página cria a **senha da família**; as outras pessoas só entram depois disso.
+- **Chaves de acesso:** além da senha (obrigatória, serve de reserva), cada pessoa pode cadastrar
+  a **digital ou o Face ID** do próprio aparelho (passkey com a extensão PRF). Funciona só onde o
+  navegador permite; se não permitir, o app avisa e a senha continua valendo.
+- Os dados são **criptografados no próprio aparelho** com uma chave aleatória (AES-256-GCM). Essa
+  chave fica guardada cifrada em cada "fechadura": pela senha (PBKDF2-SHA256, 600.000 iterações)
+  ou pela biometria. Nenhuma senha ou chave é salva ou enviada.
+- **Versão online (claude.ai):** o conteúdo cifrado fica no armazenamento da página, que só quem
+  tem acesso a ela alcança. **Arquivo aberto no computador:** fica no navegador; dados de versões
   antigas (sem senha) são protegidos com a nova senha e a cópia aberta é apagada.
+- Trocar a senha da família não exige cadastrar a biometria de novo.
+- Quem tiver acesso só para ver a página abre os dados em **modo somente leitura**.
 - A página **bloqueia sozinha após 15 minutos sem uso** e tem o botão **Bloquear**.
 - **Não há como recuperar a senha.** Guarde-a num gerenciador de senhas.
-- **Fazer backup** baixa uma cópia criptografada; para restaurar, é preciso a senha usada na época.
+- **Fazer backup** baixa uma cópia criptografada, que abre com a senha da família da época.
