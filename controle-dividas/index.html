@@ -1,28 +1,34 @@
-<!doctype html>
-<html lang="pt-BR">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Controle de Dívidas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
 <style>
   :root {
     --bg: #f4f6f9; --card: #ffffff; --text: #1b2430; --muted: #66727f; --border: #dfe4ea;
     --primary: #2563eb; --primary-text: #ffffff; --danger: #dc2626; --ok: #15803d; --warn: #b45309;
     --ok-bg: #dcfce7; --danger-bg: #fee2e2; --warn-bg: #fef3c7; --info-bg: #dbeafe;
-    --shadow: 0 1px 3px rgba(0,0,0,.08);
+    --shadow: 0 1px 3px rgba(0,0,0,.08); --scrim: rgba(15,23,42,.45);
+    color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
       --bg: #11151b; --card: #1a2029; --text: #e6eaf0; --muted: #98a3b0; --border: #2c3542;
       --primary: #3b82f6; --danger: #f87171; --ok: #4ade80; --warn: #fbbf24;
       --ok-bg: #12351f; --danger-bg: #3d1717; --warn-bg: #3a2c0c; --info-bg: #172a4a;
-      --shadow: none;
+      --shadow: none; --scrim: rgba(0,0,0,.6);
+      color-scheme: dark;
     }
+  }
+  :root[data-theme="dark"] {
+    --bg: #11151b; --card: #1a2029; --text: #e6eaf0; --muted: #98a3b0; --border: #2c3542;
+    --primary: #3b82f6; --danger: #f87171; --ok: #4ade80; --warn: #fbbf24;
+    --ok-bg: #12351f; --danger-bg: #3d1717; --warn-bg: #3a2c0c; --info-bg: #172a4a;
+    --shadow: none; --scrim: rgba(0,0,0,.6);
+    color-scheme: dark;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   header { background: var(--card); border-bottom: 1px solid var(--border); }
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding-block: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  table { font-size: inherit; }
   header .wrap { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
   h1 { font-size: 20px; margin: 0; }
   h2 { font-size: 17px; margin: 28px 0 12px; }
@@ -63,7 +69,27 @@
   .bar > div { height: 100%; background: var(--ok); }
   .empty { color: var(--muted); text-align: center; padding: 24px; }
   dialog { border: 1px solid var(--border); border-radius: 14px; padding: 0; background: var(--card); color: var(--text); width: min(980px, calc(100vw - 24px)); max-height: calc(100vh - 32px); }
-  dialog::backdrop { background: rgba(0,0,0,.45); }
+  dialog::backdrop { background: var(--scrim); }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible, .debt:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  button:disabled { opacity: .6; cursor: default; }
+  button.danger-fill { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .lock { min-height: 100vh; display: grid; place-items: center; padding-block: 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .lock-card { width: min(440px, 100%); display: grid; gap: 14px; padding: 24px; }
+  .lock-card h1 { font-size: 22px; }
+  .lock-card form { display: grid; gap: 12px; }
+  .lock-card p { margin: 0; }
+  .lock-badge { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; font-weight: 600; color: var(--ok); background: var(--ok-bg); padding: 3px 10px; border-radius: 999px; justify-self: start; }
+  .error { color: var(--danger); font-size: 14px; min-height: 1.2em; }
+  .error:empty { display: none; }
+  .warn-box { background: var(--warn-bg); color: var(--text); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+  .meter { height: 6px; border-radius: 99px; background: var(--border); overflow: hidden; }
+  .meter > div { height: 100%; width: 0; background: var(--danger); transition: width .2s; }
+  .status { font-size: 13px; color: var(--muted); white-space: nowrap; align-self: center; }
+  .status.error-state { color: var(--danger); font-weight: 600; }
+  .banner { background: var(--info-bg); border-radius: 10px; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-top: 16px; }
+  .msg-text { white-space: pre-line; margin: 0 0 14px; line-height: 1.5; }
+  #dlg-msg, #dlg-pass { width: min(480px, calc(100vw - 24px)); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   .dlg-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--card); z-index: 1; }
   .dlg-head h3 { margin: 0; font-size: 17px; }
   .dlg-body { padding: 16px 18px; }
@@ -98,21 +124,47 @@
   @media (max-width: 560px) { #upcoming .hide-sm { display: none; } th, td { padding: 8px 6px; } }
   footer { color: var(--muted); font-size: 12px; text-align: center; padding: 24px 16px 40px; }
 </style>
-</head>
-<body>
+
+<!-- Tela de senha: os dados só são descriptografados depois dela -->
+<section class="lock" id="lock">
+  <div class="card lock-card">
+    <span class="lock-badge">🔒 Criptografado com a sua senha</span>
+    <h1>Controle de Dívidas</h1>
+    <p id="lock-intro" class="muted">Abrindo o cofre…</p>
+    <form id="lock-form" hidden autocomplete="on">
+      <input type="text" name="username" autocomplete="username" value="controle-dividas" hidden aria-hidden="true">
+      <div><label for="lk-pass">Senha</label><input id="lk-pass" name="password" type="password" autocomplete="current-password"></div>
+      <div id="lk-confirm-row" hidden><label for="lk-pass2">Repita a senha</label><input id="lk-pass2" type="password" autocomplete="new-password"></div>
+      <div id="lk-meter-row" hidden><div class="meter"><div id="lk-meter"></div></div><div class="help" id="lk-meter-label"></div></div>
+      <div class="warn-box" id="lk-warning" hidden>Ninguém consegue recuperar essa senha, nem o Claude. Se ela for esquecida, os dados não poderão ser abertos. Guarde-a num gerenciador de senhas ou em lugar seguro.</div>
+      <p class="error" id="lk-error" role="alert"></p>
+      <button class="primary" type="submit" id="lk-submit">Desbloquear</button>
+    </form>
+    <p class="help" id="lock-foot"></p>
+  </div>
+</section>
+
+<div id="app" hidden>
 <header>
   <div class="wrap">
-    <h1>💰 Controle de Dívidas</h1>
+    <h1>Controle de Dívidas</h1>
     <div class="actions">
+      <span class="status" id="save-status" role="status" aria-live="polite"></span>
       <button class="primary" id="btn-new">+ Novo compromisso</button>
-      <button id="btn-export" title="Baixar um arquivo com todos os seus dados">Fazer backup</button>
+      <button id="btn-export" title="Baixar uma cópia criptografada de todos os seus dados">Fazer backup</button>
       <button id="btn-import" title="Carregar um arquivo de backup">Restaurar backup</button>
+      <button id="btn-pass">Trocar senha</button>
+      <button id="btn-lock">🔒 Bloquear</button>
       <input type="file" id="file-import" accept="application/json,.json" hidden>
     </div>
   </div>
 </header>
 
 <main class="wrap">
+  <div class="banner" id="remote-banner" hidden>
+    <span>Seus dados foram alterados em outro aparelho.</span>
+    <button class="small primary" id="btn-reload-remote">Carregar a versão mais recente</button>
+  </div>
   <section class="cards" id="summary"></section>
 
   <h2>Próximos vencimentos <span class="muted" style="font-weight:400;font-size:13px">(em atraso e próximos 45 dias)</span></h2>
@@ -123,7 +175,37 @@
   <div class="debts" id="debts"></div>
 </main>
 
-<footer>Os dados ficam salvos apenas neste navegador. Faça backup de vez em quando para não perder nada.</footer>
+<footer id="footer-note"></footer>
+</div>
+
+<!-- Avisos e confirmações (a página online não usa as janelas do navegador) -->
+<dialog id="dlg-msg">
+  <form id="msg-form" method="dialog">
+    <div class="dlg-body">
+      <p class="msg-text" id="msg-text"></p>
+      <div id="msg-input-row" hidden><label for="msg-input" id="msg-input-label">Valor</label><input id="msg-input" autocomplete="off"></div>
+      <div class="actions" style="justify-content:flex-end;margin-top:14px">
+        <button type="button" id="msg-cancel">Cancelar</button>
+        <button type="submit" class="primary" id="msg-ok">OK</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-pass">
+  <form id="pass-form" method="dialog">
+    <div class="dlg-head"><h3>Trocar senha</h3><button type="button" class="small" data-close>✕</button></div>
+    <div class="dlg-body" style="display:grid;gap:12px">
+      <input type="text" name="username" autocomplete="username" value="controle-dividas" hidden aria-hidden="true">
+      <div><label for="pw-current">Senha atual</label><input id="pw-current" type="password" autocomplete="current-password"></div>
+      <div><label for="pw-new">Nova senha</label><input id="pw-new" type="password" autocomplete="new-password">
+        <div class="meter" style="margin-top:6px"><div id="pw-meter"></div></div><div class="help" id="pw-meter-label"></div></div>
+      <div><label for="pw-new2">Repita a nova senha</label><input id="pw-new2" type="password" autocomplete="new-password"></div>
+      <p class="error" id="pw-error" role="alert"></p>
+      <div class="actions" style="justify-content:flex-end"><button type="button" data-close>Cancelar</button><button class="primary" type="submit" id="pw-submit">Trocar senha</button></div>
+    </div>
+  </form>
+</dialog>
 
 <!-- Formulário de cadastro/edição -->
 <dialog id="dlg-form">
@@ -190,7 +272,6 @@
 <script>
 "use strict";
 
-const STORAGE_KEY = "controle-dividas-v1";
 
 const TYPES = {
   CONSORCIO: "Consórcio",
@@ -244,24 +325,14 @@ const fmtDate = (ymd) => (ymd ? ymd.split("-").reverse().join("/") : "—");
 const monthKey = (ymd) => ymd.slice(0, 7);
 
 // ---------- Dados ----------
-let state = load();
+let state = { debts: [] };
 let filter = "TODOS";
 let openDebtId = null;
 
-function load() {
-  try {
-    const data = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (data && Array.isArray(data.debts)) return data;
-  } catch (e) { /* dados inválidos ou armazenamento bloqueado */ }
-  return { debts: [] };
-}
+// Toda alteração redesenha a tela e agenda o salvamento criptografado
 function save() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (e) {
-    alert("Não foi possível salvar os dados neste navegador. Faça um backup para não perder as alterações.");
-  }
   render();
+  schedulePersist();
 }
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const findDebt = (id) => state.debts.find((d) => d.id === id);
@@ -826,7 +897,7 @@ $("#debt-form").addEventListener("change", (e) => {
 $("#debt-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const name = $("#f-name").value.trim();
-  if (!name) return alert("Informe o nome.");
+  if (!name) return notify("Informe o nome.");
   const mode = formMode();
   const common = {
     name,
@@ -837,7 +908,7 @@ $("#debt-form").addEventListener("submit", (e) => {
   if (mode !== "calc") {
     const totalValueRaw = $("#f-total-value").value.trim();
     common.totalValueCents = totalValueRaw ? parseMoney(totalValueRaw) : null;
-    if (totalValueRaw && common.totalValueCents == null) return alert("Valor total inválido.");
+    if (totalValueRaw && common.totalValueCents == null) return notify("Valor total inválido.");
   }
 
   if (mode === "edit") {
@@ -847,18 +918,18 @@ $("#debt-form").addEventListener("submit", (e) => {
     const paid = parseInt($("#f-paid").value || "0", 10);
     const freq = parseInt($("#f-freq").value, 10);
     const first = $("#f-first").value;
-    if (!(total >= 1 && total <= 600)) return alert("A quantidade de parcelas deve ser entre 1 e 600.");
-    if (!(paid >= 0 && paid <= total)) return alert("Parcelas já pagas não pode ser maior que o total.");
-    if (!first) return alert("Informe a data da 1ª parcela.");
+    if (!(total >= 1 && total <= 600)) return notify("A quantidade de parcelas deve ser entre 1 e 600.");
+    if (!(paid >= 0 && paid <= total)) return notify("Parcelas já pagas não pode ser maior que o total.");
+    if (!first) return notify("Informe a data da 1ª parcela.");
     let rows, calc = null;
     if (mode === "calc") {
       const res = readCalc();
-      if (res.error) return alert(res.error);
+      if (res.error) return notify(res.error);
       ({ rows, calc } = res);
       common.totalValueCents = calc.principalCents;
     } else {
       const cents = parseMoney($("#f-value").value);
-      if (!cents) return alert("Informe um valor de parcela válido. Ex.: 850,00");
+      if (!cents) return notify("Informe um valor de parcela válido. Ex.: 850,00");
       rows = Array.from({ length: total }, () => ({ cents }));
     }
     state.debts.push({
@@ -878,7 +949,7 @@ function getInst(ref) {
   return d ? d.installments.find((i) => i.n === Number(n)) : null;
 }
 
-document.addEventListener("click", (e) => {
+document.addEventListener("click", async (e) => {
   const t = e.target.closest("[data-pay],[data-unpay],[data-open],[data-edit],[data-delete],[data-contemplate],[data-filter],[data-close],[data-rmextra]");
   if (!t) return;
   const ds = t.dataset;
@@ -890,13 +961,13 @@ document.addEventListener("click", (e) => {
     if (i.due < today) {
       const days = Math.round((Date.parse(today) - Date.parse(i.due)) / 86400000);
       const estimate = i.cents + Math.round(i.cents * 0.02) + Math.round(i.cents * 0.01 * days / 30);
-      const answer = prompt(
+      const answer = await askValue(
         `Esta parcela venceu há ${days} dia(s). Quanto você pagou, com multa e juros?\n` +
         `Estimativa (multa de 2% + juros de 1% ao mês): ${money(estimate)}. Valor da parcela: ${money(i.cents)}.`,
-        centsToInput(estimate));
+        centsToInput(estimate), { label: "Valor pago (R$)", okLabel: "Marcar paga" });
       if (answer == null) return;
       const paidCents = answer.trim() ? parseMoney(answer) : i.cents;
-      if (paidCents == null) return alert("Valor inválido.");
+      if (paidCents == null) return notify("Valor inválido.");
       if (paidCents !== i.cents) i.paidCents = paidCents; else delete i.paidCents;
     }
     i.paid = today;
@@ -914,7 +985,7 @@ document.addEventListener("click", (e) => {
     openForm(ds.edit);
   } else if (ds.delete) {
     const d = findDebt(ds.delete);
-    if (d && confirm(`Excluir “${d.name}” e todas as suas parcelas? Isso não pode ser desfeito.`)) {
+    if (d && await ask(`Excluir “${d.name}” e todas as suas parcelas? Isso não pode ser desfeito.`, { okLabel: "Excluir", danger: true })) {
       state.debts = state.debts.filter((x) => x.id !== d.id);
       $("#dlg-detail").close();
       save();
@@ -927,7 +998,7 @@ document.addEventListener("click", (e) => {
     const [id, n, k] = ds.rmextra.split(":");
     const i = getInst(`${id}:${n}`);
     const x = i?.extras?.[Number(k)];
-    if (x && confirm(`Remover a cobrança de ${money(x.cents)} (${x.desc}) da parcela ${n}?`)) {
+    if (x && await ask(`Remover a cobrança de ${money(x.cents)} (${x.desc}) da parcela ${n}?`, { okLabel: "Remover", danger: true })) {
       i.cents -= x.cents;
       i.extras.splice(Number(k), 1);
       if (!i.extras.length) delete i.extras;
@@ -945,16 +1016,16 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && e.target.matches(".debt[data-open]")) e.target.click();
 });
 
-document.addEventListener("submit", (e) => {
+document.addEventListener("submit", async (e) => {
   const d = findDebt(openDebtId);
   if (!d) return;
   if (e.target.id === "amortize-form") {
     e.preventDefault();
     const extra = parseMoney($("#am-value").value);
     const mode = $("#am-mode").value;
-    if (!extra) return alert("Informe o valor da amortização. Ex.: 10.000,00");
+    if (!extra) return notify("Informe o valor da amortização. Ex.: 10.000,00");
     const sim = simulateAmortization(d, extra, mode);
-    if (sim.error) return alert(sim.error);
+    if (sim.error) return notify(sim.error);
     let msg;
     if (sim.payoff) {
       msg = `Quitação total: pagar ${money(sim.extra)} hoje.\n` +
@@ -969,7 +1040,7 @@ document.addEventListener("submit", (e) => {
         `• Próxima parcela: ${money(sim.oldCents)} → ${money(sim.rows[0].cents)}\n` +
         `• Parcelas restantes: ${sim.oldCount} (prazo mantido)\n• Economia estimada: ${money(sim.saving)}`;
     }
-    if (!confirm(msg + "\n\nConfirmar?")) return;
+    if (!(await ask(msg, { okLabel: "Amortizar" }))) return;
     applyAmortization(d, sim, mode);
     save();
     return;
@@ -980,9 +1051,9 @@ document.addEventListener("submit", (e) => {
     const cents = parseMoney($("#ex-value").value);
     const n = parseInt($("#ex-n").value, 10);
     const repeat = $("#ex-repeat").checked;
-    if (!cents) return alert("Informe o valor da cobrança. Ex.: 120,00");
+    if (!cents) return notify("Informe o valor da cobrança. Ex.: 120,00");
     const targets = d.installments.filter((i) => !i.paid && (repeat ? i.n >= n : i.n === n));
-    if (!targets.length) return alert("Escolha uma parcela em aberto.");
+    if (!targets.length) return notify("Escolha uma parcela em aberto.");
     for (const i of targets) {
       i.extras = [...(i.extras || []), { desc, cents }];
       i.cents += cents;
@@ -994,9 +1065,9 @@ document.addEventListener("submit", (e) => {
     e.preventDefault();
     const n = parseInt($("#ant-count").value, 10);
     const open = d.installments.filter((i) => !i.paid);
-    if (!(n >= 1 && n <= open.length)) return alert(`Informe de 1 a ${open.length} parcelas.`);
+    if (!(n >= 1 && n <= open.length)) return notify(`Informe de 1 a ${open.length} parcelas.`);
     const chosen = open.slice(-n);
-    if (!confirm(`Antecipar ${n} parcela(s) (nº ${chosen[0].n} a ${chosen[n - 1].n}), total ${money(sumOf(chosen, "cents"))}?`)) return;
+    if (!(await ask(`Antecipar ${n} parcela(s) (nº ${chosen[0].n} a ${chosen[n - 1].n}), total ${money(sumOf(chosen, "cents"))}?`, { okLabel: "Antecipar" }))) return;
     const today = todayYMD();
     for (const i of chosen) { i.paid = today; i.early = true; }
     save();
@@ -1006,7 +1077,7 @@ document.addEventListener("submit", (e) => {
   e.preventDefault();
   const cents = parseMoney($("#adj-value").value);
   const from = parseInt($("#adj-from").value, 10);
-  if (!cents) return alert("Informe o novo valor da parcela. Ex.: 912,40");
+  if (!cents) return notify("Informe o novo valor da parcela. Ex.: 912,40");
   let changed = 0;
   for (const i of d.installments) {
     if (!i.paid && i.n >= from) {
@@ -1015,17 +1086,452 @@ document.addEventListener("submit", (e) => {
       changed++;
     }
   }
-  if (!changed) return alert("Nenhuma parcela em aberto a partir desse número.");
+  if (!changed) return notify("Nenhuma parcela em aberto a partir desse número.");
   save();
+});
+
+// ---------- Avisos e confirmações dentro da página ----------
+// (a página publicada não pode usar alert/confirm/prompt do navegador)
+function modal({ text, input = null, label = "Valor", type = "text", okLabel = "OK", cancel = true, danger = false }) {
+  return new Promise((resolve) => {
+    const dlg = $("#dlg-msg"), form = $("#msg-form"), inp = $("#msg-input");
+    const okBtn = $("#msg-ok"), cancelBtn = $("#msg-cancel");
+    $("#msg-text").textContent = text;
+    $("#msg-input-row").hidden = input == null;
+    $("#msg-input-label").textContent = label;
+    inp.type = type;
+    inp.value = input ?? "";
+    okBtn.textContent = okLabel;
+    okBtn.classList.toggle("primary", !danger);
+    okBtn.classList.toggle("danger-fill", danger);
+    cancelBtn.hidden = !cancel;
+    const finish = (value) => {
+      form.removeEventListener("submit", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+      dlg.removeEventListener("cancel", onCancel);
+      if (dlg.open) dlg.close();
+      inp.value = "";
+      resolve(value);
+    };
+    const onOk = (e) => { e.preventDefault(); finish(input != null ? inp.value : true); };
+    const onCancel = (e) => { e.preventDefault(); finish(input != null ? null : false); };
+    form.addEventListener("submit", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+    dlg.addEventListener("cancel", onCancel);
+    dlg.showModal();
+    (input != null ? inp : okBtn).focus();
+  });
+}
+const notify = (text) => modal({ text, cancel: false });
+const ask = (text, opts = {}) => modal({ text, okLabel: "Confirmar", ...opts });
+const askValue = (text, value, opts = {}) => modal({ text, input: value, okLabel: "Confirmar", ...opts });
+
+// ---------- Cofre criptografado ----------
+// Os dados são criptografados neste aparelho (AES-256-GCM) com uma chave derivada da senha
+// (PBKDF2-SHA256, 600.000 iterações). A senha e a chave nunca são salvas nem enviadas.
+// No claude.ai, o conteúdo criptografado fica na área privada da sua conta (data/users/<id>),
+// que nem outras pessoas com acesso à página conseguem ler. Aberto como arquivo, fica no navegador.
+const VAULT_LOCAL_KEY = "controle-dividas-vault-v1";
+const LEGACY_LOCAL_KEY = "controle-dividas-v1"; // versão antiga, sem senha
+const KDF_ITERATIONS = 600000;
+const CHUNK_CHARS = 200000; // cada documento guardado tem limite de 256 KiB
+const AAD = new TextEncoder().encode("controle-dividas:v1");
+const AUTO_LOCK_MS = 15 * 60 * 1000;
+const MIN_PASSWORD = 10;
+
+const toB64 = (u8) => {
+  let s = "";
+  for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return btoa(s);
+};
+const fromB64 = (str) => Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
+const randomHex = (n) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => b.toString(16).padStart(2, "0")).join("");
+
+async function deriveKey(password, kdf) {
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(password.normalize("NFC")), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", hash: "SHA-256", salt: fromB64(kdf.salt), iterations: kdf.iter },
+    base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+const newKdf = () => ({ name: "PBKDF2-SHA256", iter: KDF_ITERATIONS, salt: toB64(crypto.getRandomValues(new Uint8Array(16))) });
+
+async function pipeBytes(bytes, stream) {
+  return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
+}
+
+async function seal(key, kdf, obj) {
+  let bytes = new TextEncoder().encode(JSON.stringify(obj));
+  const z = typeof CompressionStream === "function";
+  if (z) bytes = await pipeBytes(bytes, new CompressionStream("gzip"));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: AAD }, key, bytes));
+  return { app: "controle-dividas", v: 1, kdf, iv: toB64(iv), z, ct: toB64(ct), rev: randomHex(8), updatedAt: new Date().toISOString() };
+}
+
+// Falha (rejeita) se a senha estiver errada ou o conteúdo tiver sido alterado
+async function unseal(key, vault) {
+  let bytes = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(vault.iv), additionalData: AAD }, key, fromB64(vault.ct)));
+  if (vault.z) bytes = await pipeBytes(bytes, new DecompressionStream("gzip"));
+  const data = JSON.parse(new TextDecoder().decode(bytes));
+  if (!data || !Array.isArray(data.debts)) throw new Error("formato");
+  return data;
+}
+
+// Armazenamento na conta (claude.ai): um documento de controle + partes do conteúdo criptografado.
+// As partes de cada versão têm nome próprio, então quem lê nunca mistura versões.
+function cloudBackend(db, uid) {
+  const base = `data/users/${uid}`;
+  const metaRef = db.doc(`${base}/vault`);
+  const partRef = (rev, i) => db.doc(`${base}/vault-${rev}-${i}`);
+  return {
+    where: "na sua conta Claude",
+    async read() {
+      const m = await metaRef.get();
+      if (!m.exists) return null;
+      const meta = m.data();
+      let ct = "";
+      for (let i = 0; i < meta.parts; i++) {
+        const part = await partRef(meta.rev, i).get();
+        if (!part.exists) throw new Error("incompleto");
+        ct += part.data().d;
+      }
+      return { ...meta, ct };
+    },
+    async write(vault, previous) {
+      const { ct, ...meta } = vault;
+      const parts = [];
+      for (let i = 0; i < ct.length; i += CHUNK_CHARS) parts.push(ct.slice(i, i + CHUNK_CHARS));
+      for (let i = 0; i < parts.length; i++) await partRef(vault.rev, i).set({ d: parts[i] });
+      await metaRef.set({ ...meta, parts: parts.length });
+      if (previous?.rev && previous.rev !== vault.rev) {
+        for (let i = 0; i < (previous.parts || 0); i++) await partRef(previous.rev, i).delete().catch(() => {});
+      }
+      return parts.length;
+    },
+    watch(onRev) {
+      return metaRef.onSnapshot((snap) => {
+        if (snap.exists && !snap.metadata.hasPendingWrites) onRev(snap.data().rev);
+      }, () => {});
+    },
+  };
+}
+
+const localBackend = {
+  where: "neste navegador",
+  async read() {
+    const raw = localStorage.getItem(VAULT_LOCAL_KEY);
+    return raw ? JSON.parse(raw) : null;
+  },
+  async write(vault) {
+    localStorage.setItem(VAULT_LOCAL_KEY, JSON.stringify(vault));
+    return 0;
+  },
+  watch() { return () => {}; },
+};
+
+let backend = null;
+let downloadsApi = null;
+let vaultKey = null;      // CryptoKey não exportável, só na memória
+let vaultKdf = null;
+let lastVault = null;     // última versão salva (criptografada)
+let storedVault = null;   // versão encontrada ao abrir a tela de senha
+let lockMode = "unlock";  // "unlock" | "create"
+let failedTries = 0;
+let unwatch = () => {};
+let legacyData = null;
+
+function readLegacy() {
+  try {
+    const data = JSON.parse(localStorage.getItem(LEGACY_LOCAL_KEY));
+    return data && Array.isArray(data.debts) ? data : null;
+  } catch (e) { return null; }
+}
+
+function lockScreen(intro, { form = true, foot = "" } = {}) {
+  $("#app").hidden = true;
+  $("#lock").hidden = false;
+  $("#lock-intro").textContent = intro;
+  $("#lock-form").hidden = !form;
+  $("#lock-foot").textContent = foot;
+  if (form) {
+    const create = lockMode === "create";
+    $("#lk-confirm-row").hidden = !create;
+    $("#lk-meter-row").hidden = !create;
+    $("#lk-warning").hidden = !create;
+    $("#lk-pass").autocomplete = create ? "new-password" : "current-password";
+    $("#lk-submit").textContent = create ? "Criar senha e abrir" : "Desbloquear";
+    $("#lk-pass").value = "";
+    $("#lk-pass2").value = "";
+    $("#lk-error").textContent = "";
+    updateMeter($("#lk-pass"), $("#lk-meter"), $("#lk-meter-label"));
+    $("#lk-pass").focus();
+  }
+}
+
+async function initVault() {
+  if (!window.crypto?.subtle) {
+    lockScreen("Este navegador não oferece a criptografia necessária. Abra a página num navegador atualizado (Chrome, Edge, Safari ou Firefox).", { form: false });
+    return;
+  }
+  if (window.claude?.use) {
+    const [db, user, downloads] = await Promise.all([claude.use("db"), claude.use("user"), claude.use("downloads")]);
+    downloadsApi = downloads;
+    const uid = user ? await user.id() : null;
+    if (!db || !uid) {
+      lockScreen("Para abrir seus dados, entre na sua conta no claude.ai e abra esta página por lá.", { form: false });
+      return;
+    }
+    backend = cloudBackend(db, uid);
+  } else {
+    backend = localBackend;
+    legacyData = readLegacy();
+  }
+  await openLock();
+}
+
+async function openLock(message) {
+  try {
+    storedVault = await backend.read();
+  } catch (e) {
+    lockScreen("Não foi possível carregar seus dados agora. Verifique a conexão e recarregue a página.", { form: false });
+    return;
+  }
+  lockMode = storedVault ? "unlock" : "create";
+  const foot = `Seus dados ficam salvos ${backend.where}, criptografados. A senha nunca sai deste aparelho.`;
+  if (lockMode === "create") {
+    lockScreen(
+      (legacyData ? `Encontramos ${legacyData.debts.length} compromisso(s) salvos sem senha neste navegador. ` +
+        "Crie uma senha para protegê-los." : "Crie uma senha para proteger os dados financeiros da sua família.") +
+      ` Use pelo menos ${MIN_PASSWORD} caracteres; uma frase com várias palavras é mais fácil de lembrar.`, { foot });
+  } else {
+    lockScreen(message || "Digite sua senha para abrir seus dados.", { foot });
+  }
+}
+
+function passwordScore(pw) {
+  let score = 0;
+  if (pw.length >= MIN_PASSWORD) score++;
+  if (pw.length >= 14) score++;
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) score++;
+  if (/\d/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw) || pw.split(/\s+/).length >= 3) score++;
+  return pw.length < MIN_PASSWORD ? Math.min(score, 1) : score;
+}
+function updateMeter(input, bar, label) {
+  const pw = input.value;
+  const score = passwordScore(pw);
+  const levels = [["Muito fraca", "var(--danger)"], ["Fraca", "var(--danger)"], ["Razoável", "var(--warn)"], ["Boa", "var(--warn)"], ["Forte", "var(--ok)"], ["Muito forte", "var(--ok)"]];
+  bar.style.width = pw ? `${Math.max(10, (score / 5) * 100)}%` : "0";
+  bar.style.background = levels[score][1];
+  label.textContent = pw ? (pw.length < MIN_PASSWORD ? `Faltam ${MIN_PASSWORD - pw.length} caractere(s).` : `Senha ${levels[score][0].toLowerCase()}.`) : "";
+}
+$("#lk-pass").addEventListener("input", () => updateMeter($("#lk-pass"), $("#lk-meter"), $("#lk-meter-label")));
+$("#pw-new").addEventListener("input", () => updateMeter($("#pw-new"), $("#pw-meter"), $("#pw-meter-label")));
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+$("#lock-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const pw = $("#lk-pass").value;
+  const err = $("#lk-error");
+  const btn = $("#lk-submit");
+  err.textContent = "";
+  if (lockMode === "create") {
+    if (pw.length < MIN_PASSWORD) { err.textContent = `A senha precisa ter pelo menos ${MIN_PASSWORD} caracteres.`; return; }
+    if (pw !== $("#lk-pass2").value) { err.textContent = "As duas senhas não são iguais."; return; }
+    btn.disabled = true; btn.textContent = "Protegendo…";
+    try {
+      vaultKdf = newKdf();
+      vaultKey = await deriveKey(pw, vaultKdf);
+      state = legacyData || { debts: [] };
+      await persistNow(true);
+      if (legacyData) { try { localStorage.removeItem(LEGACY_LOCAL_KEY); } catch (e2) { /* ignora */ } legacyData = null; }
+      enterApp();
+    } catch (e2) {
+      vaultKey = null;
+      err.textContent = "Não foi possível salvar. Verifique a conexão e tente de novo.";
+    } finally { btn.disabled = false; btn.textContent = "Criar senha e abrir"; }
+    return;
+  }
+  if (!pw) { err.textContent = "Digite a senha."; return; }
+  btn.disabled = true; btn.textContent = "Abrindo…";
+  try {
+    if (failedTries >= 3) await wait(Math.min(30000, 1000 * 2 ** (failedTries - 3)));
+    const key = await deriveKey(pw, storedVault.kdf);
+    let data;
+    try { data = await unseal(key, storedVault); } catch (e2) {
+      failedTries++;
+      err.textContent = failedTries >= 3 ? "Senha incorreta. Aguarde alguns segundos antes de tentar de novo." : "Senha incorreta.";
+      $("#lk-pass").select();
+      return;
+    }
+    failedTries = 0;
+    vaultKey = key;
+    vaultKdf = storedVault.kdf;
+    lastVault = storedVault;
+    state = data;
+    enterApp();
+  } finally { btn.disabled = false; btn.textContent = "Desbloquear"; }
+});
+
+function enterApp() {
+  $("#lk-pass").value = "";
+  $("#lk-pass2").value = "";
+  $("#lock").hidden = true;
+  $("#app").hidden = false;
+  $("#remote-banner").hidden = true;
+  $("#footer-note").textContent = `Dados criptografados com a sua senha e salvos ${backend.where}. ` +
+    "A página bloqueia sozinha após 15 minutos sem uso. Faça backup de vez em quando.";
+  lastActivity = Date.now();
+  setStatus(dirty ? "pending" : "saved");
+  render();
+  unwatch();
+  unwatch = backend.watch((rev) => {
+    if (vaultKey && lastVault && rev !== lastVault.rev) $("#remote-banner").hidden = false;
+  });
+}
+
+async function lockNow(message) {
+  clearTimeout(persistTimer);
+  if (dirty && vaultKey) { persistChain = persistChain.then(() => persistNow()); }
+  await persistChain;
+  unwatch(); unwatch = () => {};
+  for (const d of document.querySelectorAll("dialog[open]")) d.close();
+  vaultKey = null;
+  state = { debts: [] };
+  openDebtId = null;
+  // Limpa tudo o que foi mostrado, para nada ficar na página bloqueada
+  $("#debt-form").reset();
+  $("#charges-list").innerHTML = "";
+  $("#calc-preview").innerHTML = "";
+  $("#detail-title").textContent = "";
+  $("#detail-body").innerHTML = "";
+  $("#msg-text").textContent = "";
+  render();
+  await openLock(message);
+}
+
+// ---------- Salvamento ----------
+let persistTimer = null;
+let persistChain = Promise.resolve();
+let dirty = false;
+
+function setStatus(kind) {
+  const el = $("#save-status");
+  const text = { pending: "Alterações não salvas…", saving: "Salvando…", saved: "🔒 Salvo e criptografado", error: "⚠ Erro ao salvar — tentando de novo" }[kind];
+  el.textContent = text;
+  el.classList.toggle("error-state", kind === "error");
+}
+
+function schedulePersist() {
+  if (!vaultKey) return;
+  dirty = true;
+  setStatus("pending");
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => { persistChain = persistChain.then(() => persistNow()); }, 700);
+}
+
+async function persistNow(throwOnError = false) {
+  if (!vaultKey) return;
+  dirty = false;
+  setStatus("saving");
+  try {
+    const vault = await seal(vaultKey, vaultKdf, state);
+    vault.parts = await backend.write(vault, lastVault);
+    lastVault = vault;
+    setStatus(dirty ? "pending" : "saved");
+  } catch (e) {
+    dirty = true;
+    setStatus("error");
+    if (throwOnError) throw e;
+    clearTimeout(persistTimer);
+    persistTimer = setTimeout(() => { persistChain = persistChain.then(() => persistNow()); }, 5000);
+  }
+}
+
+async function flush() {
+  clearTimeout(persistTimer);
+  if (dirty) persistChain = persistChain.then(() => persistNow());
+  await persistChain;
+}
+
+$("#btn-reload-remote").addEventListener("click", async () => {
+  if (dirty && !(await ask("Há alterações deste aparelho que ainda não foram salvas. Carregar a versão do outro aparelho vai descartá-las.", { okLabel: "Carregar mesmo assim", danger: true }))) return;
+  try {
+    const vault = await backend.read();
+    state = await unseal(vaultKey, vault);
+    lastVault = vault;
+    dirty = false;
+    clearTimeout(persistTimer);
+    $("#remote-banner").hidden = true;
+    setStatus("saved");
+    render();
+  } catch (e) {
+    await lockNow("A senha foi trocada em outro aparelho. Digite a nova senha.");
+  }
+});
+
+// ---------- Bloqueio automático ----------
+let lastActivity = Date.now();
+for (const ev of ["pointerdown", "keydown", "wheel", "touchstart"]) {
+  document.addEventListener(ev, () => { lastActivity = Date.now(); }, { passive: true });
+}
+setInterval(() => {
+  if (vaultKey && Date.now() - lastActivity > AUTO_LOCK_MS) lockNow("Bloqueado por inatividade. Digite sua senha para continuar.");
+}, 30000);
+$("#btn-lock").addEventListener("click", () => lockNow("Página bloqueada. Digite sua senha para abrir."));
+
+// ---------- Trocar senha ----------
+$("#btn-pass").addEventListener("click", () => {
+  for (const id of ["#pw-current", "#pw-new", "#pw-new2"]) $(id).value = "";
+  $("#pw-error").textContent = "";
+  updateMeter($("#pw-new"), $("#pw-meter"), $("#pw-meter-label"));
+  $("#dlg-pass").showModal();
+  $("#pw-current").focus();
+});
+$("#pass-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const err = $("#pw-error");
+  const btn = $("#pw-submit");
+  const current = $("#pw-current").value, next = $("#pw-new").value;
+  err.textContent = "";
+  if (next.length < MIN_PASSWORD) { err.textContent = `A nova senha precisa ter pelo menos ${MIN_PASSWORD} caracteres.`; return; }
+  if (next !== $("#pw-new2").value) { err.textContent = "As duas novas senhas não são iguais."; return; }
+  btn.disabled = true; btn.textContent = "Trocando…";
+  try {
+    await flush();
+    try { await unseal(await deriveKey(current, vaultKdf), lastVault); } catch (e2) { err.textContent = "A senha atual está incorreta."; return; }
+    const oldKey = vaultKey, oldKdf = vaultKdf;
+    vaultKdf = newKdf();
+    vaultKey = await deriveKey(next, vaultKdf);
+    try { await persistNow(true); } catch (e2) {
+      vaultKey = oldKey; vaultKdf = oldKdf;
+      err.textContent = "Não foi possível salvar com a nova senha. Nada foi alterado; tente de novo.";
+      return;
+    }
+    $("#dlg-pass").close();
+    notify("Senha trocada. Backups feitos antes continuam abrindo com a senha antiga.");
+  } finally { btn.disabled = false; btn.textContent = "Trocar senha"; }
 });
 
 // ---------- Backup ----------
 $("#btn-new").addEventListener("click", () => openForm());
-$("#btn-export").addEventListener("click", () => {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+$("#btn-export").addEventListener("click", async () => {
+  await flush();
+  if (!lastVault) return notify("Não há dados salvos para o backup ainda.");
+  const { parts, ...vault } = lastVault;
+  const text = JSON.stringify(vault);
+  const filename = `backup-dividas-${todayYMD()}.json`;
+  if (downloadsApi) {
+    try { await downloadsApi.save({ filename, data: text }); } catch (err) {
+      if (err?.code !== "declined") notify("Não foi possível baixar o backup aqui. Tente abrir a página num navegador de computador.");
+    }
+    return;
+  }
+  if (window.claude?.use) return notify("Este aparelho não permite baixar arquivos por aqui. Tente abrir a página num navegador de computador.");
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `backup-dividas-${todayYMD()}.json`;
+  a.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+  a.download = filename;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
@@ -1034,19 +1540,25 @@ $("#file-import").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   e.target.value = "";
   if (!file) return;
-  try {
-    const data = JSON.parse(await file.text());
-    if (!data || !Array.isArray(data.debts)) throw new Error("formato");
-    if (!confirm(`Restaurar ${data.debts.length} compromisso(s)? Os dados atuais serão substituídos.`)) return;
-    state = data;
-    save();
-  } catch (err) {
-    alert("Arquivo de backup inválido.");
+  let data;
+  try { data = JSON.parse(await file.text()); } catch (err) { return notify("Arquivo de backup inválido."); }
+  let restored = null;
+  if (data && data.app === "controle-dividas" && data.ct && data.kdf) {
+    const pw = await askValue("Este backup é criptografado. Digite a senha que estava em uso quando ele foi feito.", "",
+      { label: "Senha do backup", type: "password", okLabel: "Abrir backup" });
+    if (pw == null) return;
+    try { restored = await unseal(await deriveKey(pw, data.kdf), data); } catch (err) { return notify("Senha incorreta para este backup."); }
+  } else if (data && Array.isArray(data.debts)) {
+    restored = data; // backup antigo, da versão sem senha
+  } else {
+    return notify("Arquivo de backup inválido.");
   }
+  if (!(await ask(`Restaurar ${restored.debts.length} compromisso(s)? Os dados atuais serão substituídos.`, { okLabel: "Restaurar", danger: true }))) return;
+  state = restored;
+  save();
 });
 
 fillSelects();
 render();
+initVault();
 </script>
-</body>
-</html>

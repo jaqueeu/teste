@@ -45,8 +45,15 @@ Sisteminha para acompanhar consórcios, empréstimos, financiamentos e parcelame
 **Dica:** financiamento com parcela mensal + parcela anual (intermediária/balão)? Cadastre dois
 compromissos: um mensal e outro anual.
 
-## Onde ficam os dados
+## Segurança e onde ficam os dados
 
-Ficam salvos no próprio navegador (localStorage), só no computador/celular onde você usa.
-Use **Fazer backup** de vez em quando para baixar um arquivo `.json`, e **Restaurar backup**
-para carregar esse arquivo em outro navegador ou aparelho.
+- O app pede uma **senha** (mínimo de 10 caracteres). Ela nunca é salva nem enviada.
+- Os dados são **criptografados no próprio aparelho** (AES-256-GCM, chave derivada da senha com
+  PBKDF2-SHA256 e 600.000 iterações) antes de serem guardados.
+- **Versão online (claude.ai):** o conteúdo criptografado fica na área privada da sua conta, que
+  nem outras pessoas com acesso à página conseguem ler; sem a senha, ele é ilegível.
+- **Arquivo aberto no computador:** o conteúdo criptografado fica no navegador. Dados de versões
+  antigas (sem senha) são protegidos com a nova senha e a cópia aberta é apagada.
+- A página **bloqueia sozinha após 15 minutos sem uso** e tem o botão **Bloquear**.
+- **Não há como recuperar a senha.** Guarde-a num gerenciador de senhas.
+- **Fazer backup** baixa uma cópia criptografada; para restaurar, é preciso a senha usada na época.
