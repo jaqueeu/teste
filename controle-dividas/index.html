@@ -58,8 +58,17 @@
   .filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
   .filters button.active { background: var(--primary); color: var(--primary-text); border-color: var(--primary); }
   .debts { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
-  .debt { cursor: pointer; }
-  .debt:hover { border-color: var(--primary); }
+  .debt { cursor: pointer; padding-top: 0; overflow: hidden; --bank: var(--primary); --bank-ink: #fff;
+    background: color-mix(in srgb, var(--bank) 7%, var(--card)); border-color: color-mix(in srgb, var(--bank) 45%, var(--border)); }
+  .debt:hover { border-color: var(--bank); }
+  .bank-band { margin: 0 -16px 12px; padding: 9px 16px; background: var(--bank); color: var(--bank-ink); display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 650; font-size: 13px; }
+  .bank-band > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .owner-chip { background: color-mix(in srgb, var(--bank-ink) 20%, transparent); color: var(--bank-ink); padding: 2px 10px; border-radius: 999px; font-size: 12px; white-space: nowrap; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: baseline; box-shadow: 0 0 0 1px var(--border); }
+  #dlg-detail .dlg-head.banked { background: var(--bank); color: var(--bank-ink); }
+  #dlg-detail .dlg-head.banked button { background: transparent; color: var(--bank-ink); border-color: color-mix(in srgb, var(--bank-ink) 40%, transparent); }
+  .owners { align-items: center; margin-top: 16px; margin-bottom: 0; }
+  .owners .lbl { color: var(--muted); font-size: 13px; margin-right: 2px; }
   .debt .top { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
   .debt .name { font-weight: 650; font-size: 16px; }
   .debt .inst { color: var(--muted); font-size: 13px; }
@@ -181,6 +190,7 @@
     <span>Seus dados foram alterados em outro aparelho.</span>
     <button class="small primary" id="btn-reload-remote">Carregar a versão mais recente</button>
   </div>
+  <div class="filters owners" id="owner-filters"></div>
   <section class="cards" id="summary"></section>
 
   <h2>Próximos vencimentos <span class="muted" style="font-weight:400;font-size:13px">(em atraso e próximos 45 dias)</span></h2>
@@ -217,7 +227,7 @@
       <div><label for="pk-label">Nome deste aparelho</label><input id="pk-label" placeholder="Ex.: iPhone da Jaque, Celular do pai" autocomplete="off"></div>
       <button type="button" class="primary" id="btn-add-passkey">Cadastrar digital ou Face ID deste aparelho</button>
     </div>
-    <p class="help" id="pk-unsupported" hidden>Este navegador não permite cadastrar digital ou Face ID aqui. Use a senha da família.</p>
+    <p class="help" id="pk-unsupported" hidden>Dentro do claude.ai o navegador não permite criar a chave de digital ou Face ID. Faça assim: salve a senha da família no gerenciador de senhas do celular (no iPhone, app Senhas, site claude.ai). Depois, ao tocar no campo de senha, o celular oferece preencher com Face ID ou digital.</p>
     <p class="error" id="pk-error" role="alert"></p>
   </div>
 </dialog>
@@ -246,6 +256,10 @@
       <div><label for="f-type">Tipo *</label>
         <select id="f-type"></select></div>
       <div><label for="f-inst">Banco / administradora</label><input id="f-inst" placeholder="Ex.: Caixa, Porto Seguro"></div>
+      <div><label for="f-owner">No nome de</label><input id="f-owner" list="owners-list" placeholder="Ex.: Pai, Mãe, Dudu" autocomplete="off"><datalist id="owners-list"></datalist></div>
+      <div><label for="f-color-mode">Cor do card</label>
+        <div class="pair"><select id="f-color-mode"><option value="auto">Cor do banco</option><option value="custom">Escolher outra</option></select>
+          <input type="color" id="f-color" value="#2563eb" hidden aria-label="Cor do card"></div></div>
       <div><label for="f-freq">Periodicidade *</label><select id="f-freq"></select></div>
       <div><label for="f-total">Quantidade de parcelas *</label><input id="f-total" type="number" min="1" max="600" required></div>
       <div><label for="f-first">Vencimento da 1ª parcela *</label><input id="f-first" type="date" required></div>
@@ -316,6 +330,51 @@ const FREQS = {
   1: "Mensal", 2: "Bimestral", 3: "Trimestral", 6: "Semestral", 12: "Anual",
 };
 
+// ---------- Cores dos bancos e titulares ----------
+// Cor da marca de cada instituição (fundo da faixa do card, cor do texto sobre ela)
+const BANK_COLORS = [
+  [/banco do brasil|\bbb\b/, "#FCF800", "#1F3A93"],
+  [/sicredi/, "#3FA110", "#FFFFFF"],
+  [/sicoob/, "#003641", "#C9D200"],
+  [/caixa/, "#005CA9", "#FFFFFF"],
+  [/itau/, "#EC7000", "#FFFFFF"],
+  [/bradesco/, "#CC092F", "#FFFFFF"],
+  [/santander/, "#EC0000", "#FFFFFF"],
+  [/nubank|\bnu\b/, "#820AD1", "#FFFFFF"],
+  [/\binter\b/, "#FF7A00", "#FFFFFF"],
+  [/\bc6\b/, "#242424", "#FFFFFF"],
+  [/btg/, "#0B2341", "#FFFFFF"],
+  [/banrisul/, "#0055A5", "#FFFFFF"],
+  [/mercado pago/, "#00B1EA", "#FFFFFF"],
+  [/picpay/, "#21C25E", "#FFFFFF"],
+  [/porto/, "#0046C0", "#FFFFFF"],
+];
+const DEFAULT_OWNERS = ["Pai", "Mãe", "Dudu"];
+const normalize = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+function inkFor(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.4 ? "#111827" : "#FFFFFF";
+}
+function bankTheme(d) {
+  if (d.color && /^#[0-9a-f]{6}$/i.test(d.color)) return { bg: d.color, ink: inkFor(d.color) };
+  const name = normalize(d.institution);
+  for (const [re, bg, ink] of BANK_COLORS) if (re.test(name)) return { bg, ink };
+  // Instituição sem cor conhecida: uma cor fixa calculada a partir do nome
+  let h = 0;
+  for (const ch of name || "?") h = (h * 31 + ch.charCodeAt(0)) % 360;
+  const hex = hslToHex(h, 55, 40);
+  return { bg: hex, ink: "#FFFFFF" };
+}
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const f = (n) => { const k = (n + h / 30) % 12; const c = l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1)); return Math.round(c * 255).toString(16).padStart(2, "0"); };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+const bankStyle = (d) => { const t = bankTheme(d); return `--bank:${t.bg};--bank-ink:${t.ink}`; };
+const NO_OWNER = "__sem";
+const ownerKey = (d) => (d.owner || "").trim() || NO_OWNER;
+const visibleDebts = () => state.debts.filter((d) => ownerFilter === "TODOS" || ownerKey(d) === ownerFilter);
+
 // ---------- Utilidades ----------
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -357,6 +416,7 @@ const monthKey = (ymd) => ymd.slice(0, 7);
 // ---------- Dados ----------
 let state = { debts: [] };
 let filter = "TODOS";
+let ownerFilter = "TODOS";
 let openDebtId = null;
 
 // Toda alteração redesenha a tela e agenda o salvamento criptografado
@@ -549,6 +609,7 @@ function debtStats(debt) {
 // ---------- Renderização ----------
 function render() {
   const today = todayYMD();
+  renderOwnerFilters();
   renderSummary(today);
   renderUpcoming(today);
   renderFilters();
@@ -559,7 +620,7 @@ function render() {
 function renderSummary(today) {
   const thisMonth = monthKey(today);
   let monthCents = 0, monthCount = 0, monthPaidCents = 0, lateCents = 0, lateCount = 0, remaining = 0, monthlyEq = 0;
-  for (const d of state.debts) {
+  for (const d of visibleDebts()) {
     const open = d.installments.filter((i) => !i.paid);
     if (open.length) monthlyEq += (open[0].cents) / d.freq;
     for (const i of d.installments) {
@@ -588,7 +649,7 @@ function renderSummary(today) {
 function renderUpcoming(today) {
   const limit = addDays(today, 45);
   const rows = [];
-  for (const d of state.debts) {
+  for (const d of visibleDebts()) {
     for (const i of d.installments) {
       if (!i.paid && i.due <= limit) rows.push({ d, i });
     }
@@ -603,7 +664,7 @@ function renderUpcoming(today) {
     <tbody>${rows.map(({ d, i }) => `
       <tr>
         <td>${fmtDate(i.due)}</td>
-        <td><a href="#" data-open="${d.id}">${esc(d.name)}</a></td>
+        <td><span class="dot" style="background:${bankTheme(d).bg}"></span><a href="#" data-open="${d.id}">${esc(d.name)}</a>${d.owner ? `<span class="sub">${esc(d.owner)} · ${esc(d.institution || "")}</span>` : ""}</td>
         <td class="hide-sm">${i.n}/${d.installments.length}</td>
         <td class="num">${money(i.cents)}</td>
         <td class="hide-sm">${badge(statusOf(i, today))}</td>
@@ -611,17 +672,30 @@ function renderUpcoming(today) {
       </tr>`).join("")}</tbody></table>`;
 }
 
+function renderOwnerFilters() {
+  const counts = {};
+  for (const d of state.debts) counts[ownerKey(d)] = (counts[ownerKey(d)] || 0) + 1;
+  const keys = Object.keys(counts).filter((k) => k !== NO_OWNER).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  if (counts[NO_OWNER]) keys.push(NO_OWNER);
+  if (ownerFilter !== "TODOS" && !counts[ownerFilter]) ownerFilter = "TODOS";
+  const el = $("#owner-filters");
+  if (keys.length < 2 && !(keys.length === 1 && keys[0] !== NO_OWNER)) { el.innerHTML = ""; return; }
+  el.innerHTML = `<span class="lbl">No nome de:</span>` +
+    [["TODOS", `Todos (${state.debts.length})`], ...keys.map((k) => [k, `${k === NO_OWNER ? "Sem titular" : esc(k)} (${counts[k]})`])]
+      .map(([k, label]) => `<button class="small ${ownerFilter === k ? "active" : ""}" data-owner="${esc(k)}">${label}</button>`).join("");
+}
+
 function renderFilters() {
-  const counts = { TODOS: state.debts.length };
-  for (const d of state.debts) counts[d.type] = (counts[d.type] || 0) + 1;
+  const counts = { TODOS: visibleDebts().length };
+  for (const d of visibleDebts()) counts[d.type] = (counts[d.type] || 0) + 1;
   const opts = [["TODOS", "Todos"], ...Object.entries(TYPES).filter(([k]) => counts[k])];
   if (filter !== "TODOS" && !counts[filter]) filter = "TODOS";
-  $("#filters").innerHTML = state.debts.length ? opts.map(([k, label]) =>
+  $("#filters").innerHTML = visibleDebts().length ? opts.map(([k, label]) =>
     `<button class="small ${filter === k ? "active" : ""}" data-filter="${k}">${label} (${counts[k] || 0})</button>`).join("") : "";
 }
 
 function renderDebts(today) {
-  const list = state.debts
+  const list = visibleDebts()
     .filter((d) => filter === "TODOS" || d.type === filter)
     .map((d) => ({ d, s: debtStats(d) }))
     .sort((a, b) => (a.s.done - b.s.done) || (a.s.next?.due || "").localeCompare(b.s.next?.due || ""));
@@ -631,8 +705,9 @@ function renderDebts(today) {
     const nextLine = s.done
       ? `<span class="badge b-paid">Quitado ✓</span>`
       : `${fmtDate(s.next.due)} ${statusOf(s.next, today) === "late" ? badge("late") : ""}`;
-    return `<div class="card debt" data-open="${d.id}" tabindex="0">
-      <div class="top"><div><div class="name">${esc(d.name)}</div><div class="inst">${esc(d.institution || "")}</div></div>
+    return `<div class="card debt" data-open="${d.id}" tabindex="0" style="${bankStyle(d)}">
+      <div class="bank-band"><span>${esc(d.institution || "Sem instituição")}</span>${d.owner ? `<span class="owner-chip">${esc(d.owner)}</span>` : ""}</div>
+      <div class="top"><div class="name">${esc(d.name)}</div>
         <span class="badge b-type">${TYPES[d.type]}</span></div>
       <div class="row"><span>Parcela</span><b>${s.next ? `${money(s.next.cents)} · ${FREQS[d.freq].toLowerCase()}` : "—"}</b></div>
       <div class="row"><span>Próximo vencimento</span><span>${nextLine}</span></div>
@@ -720,10 +795,14 @@ function renderDetail(id) {
   const s = debtStats(d);
   const hasBreakdown = d.installments.some((i) => i.amort != null);
   $("#detail-title").textContent = d.name;
+  const head = $("#dlg-detail .dlg-head");
+  head.classList.add("banked");
+  head.setAttribute("style", bankStyle(d));
   $("#detail-body").innerHTML = `
     <div class="info-grid">
       <div><span>Tipo</span><b>${TYPES[d.type]}</b></div>
       <div><span>Instituição</span><b>${esc(d.institution || "—")}</b></div>
+      <div><span>No nome de</span><b>${esc(d.owner || "—")}</b></div>
       <div><span>Periodicidade</span><b>${FREQS[d.freq]}</b></div>
       <div><span>Parcelas pagas</span><b>${s.paidCount} de ${s.total}</b></div>
       <div><span>Total já pago</span><b>${money(s.paidCents)}</b></div>
@@ -787,6 +866,12 @@ function openForm(id) {
   $("#f-name").value = d?.name || "";
   $("#f-type").value = d?.type || "CONSORCIO";
   $("#f-inst").value = d?.institution || "";
+  $("#f-owner").value = d ? (d.owner || "") : (ownerFilter !== "TODOS" && ownerFilter !== NO_OWNER ? ownerFilter : "");
+  const known = [...new Set([...DEFAULT_OWNERS, ...state.debts.map((x) => (x.owner || "").trim()).filter(Boolean)])];
+  $("#owners-list").innerHTML = known.map((o) => `<option value="${esc(o)}"></option>`).join("");
+  $("#f-color-mode").value = d?.color ? "custom" : "auto";
+  $("#f-color").value = d?.color || bankTheme(d || { institution: "" }).bg;
+  $("#f-color").hidden = !d?.color;
   $("#f-value").value = d ? centsToInput(debtStats(d).next?.cents ?? d.installments[0].cents) : "";
   $("#f-freq").value = String(d?.freq || 1);
   $("#f-total").value = d ? d.installments.length : "";
@@ -920,6 +1005,11 @@ function updatePreview() {
 }
 
 $("#debt-form").addEventListener("input", updatePreview);
+$("#f-color-mode").addEventListener("change", () => {
+  const custom = $("#f-color-mode").value === "custom";
+  $("#f-color").hidden = !custom;
+  if (custom) $("#f-color").value = bankTheme({ institution: $("#f-inst").value }).bg;
+});
 $("#debt-form").addEventListener("change", (e) => {
   if (e.target.matches('#f-type, input[name="mode"]')) updateFormVisibility();
 });
@@ -933,6 +1023,8 @@ $("#debt-form").addEventListener("submit", (e) => {
     name,
     type: $("#f-type").value,
     institution: $("#f-inst").value.trim(),
+    owner: $("#f-owner").value.trim(),
+    color: $("#f-color-mode").value === "custom" ? $("#f-color").value : null,
     notes: $("#f-notes").value.trim(),
   };
   if (mode !== "calc") {
@@ -980,7 +1072,7 @@ function getInst(ref) {
 }
 
 document.addEventListener("click", async (e) => {
-  const t = e.target.closest("[data-pay],[data-unpay],[data-open],[data-edit],[data-delete],[data-contemplate],[data-filter],[data-close],[data-rmextra]");
+  const t = e.target.closest("[data-pay],[data-unpay],[data-open],[data-edit],[data-delete],[data-contemplate],[data-filter],[data-close],[data-rmextra],[data-owner]");
   if (!t) return;
   const ds = t.dataset;
   if (ds.pay) {
@@ -1034,6 +1126,9 @@ document.addEventListener("click", async (e) => {
       if (!i.extras.length) delete i.extras;
       save();
     }
+  } else if (ds.owner) {
+    ownerFilter = ds.owner;
+    render();
   } else if (ds.filter) {
     filter = ds.filter;
     render();
@@ -1240,8 +1335,16 @@ async function openWithPassword(vault, password) {
 }
 
 // ---------- Chaves de segurança (digital / Face ID) ----------
-const passkeysPossible = () =>
-  !!(window.PublicKeyCredential && window.isSecureContext && location.origin !== "null");
+const passkeysPossible = () => {
+  if (!window.PublicKeyCredential || !window.isSecureContext || location.origin === "null") return false;
+  // Chrome/Edge contam se a página tem permissão; quando dizem que não, nem mostramos a opção
+  const fp = document.featurePolicy || document.permissionsPolicy;
+  if (fp?.allowsFeature && !fp.allowsFeature("publickey-credentials-create")) return false;
+  return true;
+};
+const KEYCHAIN_TIP = "Dentro do claude.ai o navegador não permite criar a chave de digital ou Face ID. " +
+  "Faça assim: salve a senha da família no gerenciador de senhas do celular (no iPhone, app Senhas, site claude.ai). " +
+  "Depois, ao tocar no campo de senha, o celular oferece preencher com Face ID ou digital.";
 
 function passkeyErrorText(e) {
   if (e?.code === "noprf") return "Este aparelho ou navegador não oferece o tipo de chave de segurança que o app precisa. Use a senha da família.";
@@ -1594,11 +1697,20 @@ async function processInbox() {
   if (!inboxDb || readOnly || !dataKey) return;
   let snap;
   try { snap = await inboxDb.collection("inbox").get(); } catch (e) { return; }
-  const docs = snap.docs.filter((d) => d.exists && d.data()?.app === "controle-dividas" && Array.isArray(d.data().debts));
+  const docs = snap.docs.filter((d) => d.exists && d.data()?.app === "controle-dividas" && (Array.isArray(d.data().debts) || Array.isArray(d.data().patches)));
   if (!docs.length) return;
   const names = [];
+  let patched = 0;
+  const PATCHABLE = ["owner", "color", "name", "institution", "notes"];
   for (const doc of docs) {
-    for (const debt of doc.data().debts) {
+    // Correções pontuais: mudam só alguns campos, sem mexer nas parcelas
+    for (const p of doc.data().patches || []) {
+      const target = state.debts.find((d) => d.id === p?.id);
+      if (!target || !p.fields) continue;
+      for (const k of PATCHABLE) if (k in p.fields && (typeof p.fields[k] === "string" || p.fields[k] === null)) target[k] = p.fields[k];
+      patched++;
+    }
+    for (const debt of doc.data().debts || []) {
       if (!debt || typeof debt.id !== "string" || !Array.isArray(debt.installments) || !debt.installments.length || !TYPES[debt.type]) continue;
       const copy = JSON.parse(JSON.stringify(debt));
       const at = state.debts.findIndex((d) => d.id === copy.id);
@@ -1606,7 +1718,7 @@ async function processInbox() {
       names.push(copy.name);
     }
   }
-  if (!names.length) return;
+  if (!names.length && !patched) return;
   render();
   dirty = true;
   try {
@@ -1617,7 +1729,8 @@ async function processInbox() {
     return;
   }
   for (const doc of docs) await inboxDb.doc(`inbox/${doc.id}`).delete().catch(() => {});
-  notify(`Importados ${names.length} compromisso(s) enviados pelo Claude:\n• ${names.join("\n• ")}\n\nEles já estão salvos e criptografados no cofre da família.`);
+  notify((names.length ? `Importados ${names.length} compromisso(s) enviados pelo Claude:\n• ${names.join("\n• ")}\n\n` : "") +
+    (patched ? `${patched} compromisso(s) atualizado(s) pelo Claude.\n\n` : "") + "Tudo já está salvo e criptografado no cofre da família.");
 }
 
 async function lockNow(message) {
@@ -1773,7 +1886,9 @@ $("#btn-add-passkey").addEventListener("click", async () => {
     $("#pk-label").value = "";
     notify(`Pronto! Na próxima vez, “${label}” abre com a digital ou o Face ID.`);
   } catch (e) {
-    err.textContent = e?.code === "save" ? "A chave foi criada, mas não foi possível salvá-la. Tente de novo." : passkeyErrorText(e);
+    err.textContent = e?.code === "save" ? "A chave foi criada, mas não foi possível salvá-la. Tente de novo."
+      : (e?.name === "NotAllowedError" || e?.name === "SecurityError" || e?.name === "NotSupportedError") ? KEYCHAIN_TIP
+      : passkeyErrorText(e);
   } finally { btn.disabled = false; }
 });
 
